@@ -1,0 +1,11 @@
+node_modules/
+.next/
+.open-next/
+dist/
+*.log
+.env
+.env.local
+.DS_Store
+infra/cdk.out/
+test-results/
+playwright-report/
