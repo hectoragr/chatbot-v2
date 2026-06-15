@@ -2952,12 +2952,15 @@ Run: `npm install -D @opennextjs/aws`
 
 - [ ] **Step 2: Create `open-next.config.ts`**
 
+Installed `@opennextjs/aws@4.0.3` uses the plain default-export config (the CLI binary is `open-next`):
+
 ```ts
-import { defineCloudfrontCompatibleConfig } from '@opennextjs/aws/config';
-export default defineCloudfrontCompatibleConfig({});
+import type { OpenNextConfig } from '@opennextjs/aws/types/open-next.js';
+const config = { default: {} } satisfies OpenNextConfig;
+export default config;
 ```
 
-> If the installed `@opennextjs/aws` version uses the plain `{ default: {} }` config shape instead of `defineCloudfrontCompatibleConfig`, follow its README. The build command is `npx open-next build`, which emits `.open-next/` (server function, asset bundle, image-optimization function).
+> The build command is `open-next build` (added as the `build:opennext` npm script), which runs `next build` then emits `.open-next/` with `server-functions/default/`, `assets/`, `image-optimization-function/`, `revalidation-function/`, etc. The type import path is `@opennextjs/aws/types/open-next.js` (the package's `./*` export glob maps it to `dist/types/open-next.d.ts`).
 
 - [ ] **Step 3: Verify the OpenNext build**
 
