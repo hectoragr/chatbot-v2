@@ -1,12 +1,10 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { randomUUID } from 'crypto';
+import { type NextRequest } from 'next/server';
+import { getAuth0 } from '@/lib/auth0';
 
-export const runtime = 'nodejs';
-
-export function middleware(req: NextRequest) {
-  const res = NextResponse.next();
+export async function middleware(req: NextRequest) {
+  const res = await getAuth0().middleware(req); // mounts /auth/* and rolls session
   if (!req.cookies.get('anon_id')) {
-    res.cookies.set('anon_id', randomUUID(), {
+    res.cookies.set('anon_id', crypto.randomUUID(), {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
@@ -18,5 +16,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
+  // Run on everything except static assets; MUST include /auth/* so the SDK handles them.
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
