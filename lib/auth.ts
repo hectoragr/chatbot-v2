@@ -13,7 +13,8 @@ export function isAdminEmail(email: string | undefined): boolean {
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   const session = await getAuth0().getSession();
-  if (!session?.user?.email) return null;
+  // Require both email and sub so the returned SessionUser always satisfies its contract.
+  if (!session?.user?.email || !session.user.sub) return null;
   return {
     email: session.user.email as string,
     name: session.user.name as string | undefined,
