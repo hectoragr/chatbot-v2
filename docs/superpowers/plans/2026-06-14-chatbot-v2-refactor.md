@@ -288,10 +288,24 @@ const nextConfig: NextConfig = {
     '@cloudscape-design/component-toolkit',
     '@cloudscape-design/global-styles',
   ],
+  // The lib/* modules use ESM `.js` import specifiers that point at `.ts` source
+  // (e.g. `import { ddb } from './ddb.js'`). tsc (bundler resolution) and vitest
+  // resolve these, but Next's webpack build needs an extensionAlias to map a
+  // `.js` specifier to the `.ts`/`.tsx` source. Without it, any route handler
+  // importing the DDB lib chain fails to build ("Can't resolve './usage.js'").
+  webpack: (config) => {
+    config.resolve.extensionAlias = {
+      '.js': ['.ts', '.tsx', '.js'],
+      '.mjs': ['.mts', '.mjs'],
+    };
+    return config;
+  },
 };
 
 export default nextConfig;
 ```
+
+> The `webpack` extensionAlias was added in Phase 3 (Task 3.3) — the first route handler to import the DDB lib chain — and is required by every DDB-backed route thereafter. It is shown here in the canonical config.
 
 `vitest.config.ts`:
 
