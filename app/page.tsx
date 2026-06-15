@@ -1,3 +1,4 @@
+import { ChatShell } from '@/components/chat/ChatShell';
 export default function Home() {
-  return <main>chatbot-v2 scaffold</main>;
+  return <ChatShell />;
 }
