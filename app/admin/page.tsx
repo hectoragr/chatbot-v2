@@ -4,6 +4,7 @@ import ContentLayout from '@cloudscape-design/components/content-layout';
 import Header from '@cloudscape-design/components/header';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import Spinner from '@cloudscape-design/components/spinner';
+import Alert from '@cloudscape-design/components/alert';
 import { UsersTable } from '@/components/admin/UsersTable';
 import { TokensTable } from '@/components/admin/TokensTable';
 import { ConversationsTable } from '@/components/admin/ConversationsTable';
@@ -21,12 +22,20 @@ interface AdminTables {
 
 export default function AdminPage() {
   const [tables, setTables] = useState<AdminTables | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
-    const r = await fetch('/api/admin/tables');
-    const data = await r.json();
-    setTables(data.tables ?? {});
+    try {
+      const r = await fetch('/api/admin/tables');
+      if (!r.ok) throw new Error(`Failed to load admin tables (${r.status})`);
+      const data = await r.json();
+      setTables(data.tables ?? {});
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
+  if (error) return <Alert type="error" header="Could not load admin data">{error}</Alert>;
   if (!tables) return <Spinner />;
   return (
     <ContentLayout header={<Header variant="h1">Admin</Header>}>
