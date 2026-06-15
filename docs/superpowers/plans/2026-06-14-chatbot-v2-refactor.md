@@ -824,10 +824,16 @@ process.env.AWS_REGION = 'us-east-1';
 
 const { getQuotaStatus, consumeQuota } = await import('./quota.js');
 
+// Unique-per-run identifiers: Usage rows persist across runs and anon quota blocks
+// on max(cookie, ip), so BOTH the anonId and the ip must be fresh each run.
+const uid = () => globalThis.crypto.randomUUID();
+const randIp = () =>
+  `${10 + Math.floor(Math.random() * 240)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`;
+
 describe('quota: anonymous', () => {
   it('blocks after 3 questions even under token cap', async () => {
-    const anonId = `q-${Date.now()}`;
-    const subject = { kind: 'anon' as const, anonId, ip: `1.2.3.${Date.now() % 255}` };
+    const anonId = `q-${uid()}`;
+    const subject = { kind: 'anon' as const, anonId, ip: randIp() };
     for (let i = 0; i < 3; i++) {
       const s = await getQuotaStatus(subject);
       expect(s.blocked).toBe(false);
@@ -839,8 +845,8 @@ describe('quota: anonymous', () => {
   });
 
   it('blocks when token cap hit before question cap', async () => {
-    const anonId = `tk-${Date.now()}`;
-    const subject = { kind: 'anon' as const, anonId, ip: `9.9.9.${Date.now() % 255}` };
+    const anonId = `tk-${uid()}`;
+    const subject = { kind: 'anon' as const, anonId, ip: randIp() };
     await consumeQuota(subject, 999);
     let s = await getQuotaStatus(subject);
     expect(s.blocked).toBe(false);
@@ -1851,23 +1857,28 @@ vi.mock('@/lib/providers', () => ({ runCompletion: vi.fn(async () => ({ content:
 const { POST } = await import('@/app/api/completions/route');
 const { generateCSRFToken } = await import('@/lib/csrf');
 
-function makeReq(anonId: string) {
+// Unique-per-run cookie + ip so persistent Usage rows from prior runs don't
+// pre-exhaust the anon quota (it blocks on max(cookie, ip)). Both stay fixed
+// across the 4 calls in a single test (same subject) but differ each run.
+const anonId = `c-${globalThis.crypto.randomUUID()}`;
+const ip = `10.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`;
+
+function makeReq() {
   const { token } = generateCSRFToken('http://x');
   return new Request('http://x/api/completions', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-csrf-token': token, 'x-forwarded-for': `7.7.7.${anonId.length}`, cookie: `anon_id=${anonId}` },
+    headers: { 'content-type': 'application/json', 'x-csrf-token': token, 'x-forwarded-for': ip, cookie: `anon_id=${anonId}` },
     body: JSON.stringify({ message: 'hello', provider: 'OPENAI', model: 'gpt-4o-mini' }),
   });
 }
 
 describe('completions anon quota', () => {
-  const anonId = `c-${Date.now()}`;
   it('allows first 3 then blocks with 402', async () => {
     for (let i = 0; i < 3; i++) {
-      const res = await POST(makeReq(anonId));
+      const res = await POST(makeReq());
       expect(res.status).toBe(200);
     }
-    const res = await POST(makeReq(anonId));
+    const res = await POST(makeReq());
     expect(res.status).toBe(402);
     const body = await res.json();
     expect(body.error).toBe('quota_exceeded');
