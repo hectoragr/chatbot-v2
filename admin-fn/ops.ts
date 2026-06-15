@@ -12,7 +12,8 @@ export type AdminOp =
   | { op: 'deleteToken'; payload: { token: string } }
   | { op: 'approveToken'; payload: { tokenRequestId: string } }
   | { op: 'addBlock'; payload: { subject: string; reason: string } }
-  | { op: 'removeBlock'; payload: { subject: string } };
+  | { op: 'removeBlock'; payload: { subject: string } }
+  | { op: 'listBlocks'; payload: Record<string, never> };
 
 export async function runAdminOp(cmd: AdminOp): Promise<unknown> {
   switch (cmd.op) {
@@ -43,6 +44,8 @@ export async function runAdminOp(cmd: AdminOp): Promise<unknown> {
     case 'removeBlock':
       await removeBlock(cmd.payload.subject);
       return { removed: true };
+    case 'listBlocks':
+      return { blocks: await listBlocks() };
     default:
       throw new Error('UNKNOWN_ADMIN_OP');
   }

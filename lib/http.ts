@@ -18,3 +18,8 @@ export function fail(message: string, extra: Record<string, unknown> = {}): Resp
   // Spread extra first so the canonical error message can't be shadowed by a caller.
   return json({ ...extra, error: message }, errorStatus(message));
 }
+
+// Map an admin-route error to a response: 401 for the admin guard, else 500.
+export function adminDeny(message: string): Response {
+  return json({ error: message }, message === 'ADMIN_REQUIRED' ? 401 : 500);
+}
