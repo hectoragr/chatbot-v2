@@ -1,0 +1,238 @@
+/* Markdown Message Styling */
+.markdown-message {
+    margin: 10px 0;
+    padding: 12px 16px;
+    border-radius: 12px;
+    max-width: 80%;
+    word-wrap: break-word;
+    position: relative;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.markdown-message.prompt {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    margin-left: auto;
+}
+
+.markdown-message.response {
+    background: linear-gradient(135deg, #0056b3 0%, #007bff 100%);
+    color: white;
+    margin-right: auto;
+}
+
+/* Markdown Content Styling */
+.markdown-content {
+    line-height: 1.6;
+}
+
+.markdown-content pre {
+    overflow-y: auto;
+}
+
+.markdown-content p {
+    margin: 8px 0;
+}
+
+.markdown-content p:first-child {
+    margin-top: 0;
+}
+
+.markdown-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* Headers */
+.markdown-h1, .markdown-h2, .markdown-h3 {
+    margin: 16px 0 8px 0;
+    font-weight: 600;
+}
+
+.markdown-h1 {
+    font-size: 1.5em;
+    border-bottom: 2px solid #d4d4d4;
+    padding-bottom: 4px;
+}
+
+.markdown-h2 {
+    font-size: 1.3em;
+    color: #007bff;
+}
+
+.markdown-h3 {
+    font-size: 1.1em;
+    color: #9a9a9a;
+}
+
+/* Code Blocks */
+.code-block-container {
+    margin: 12px 0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.code-block-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f6f8fa;
+    padding: 8px 12px;
+    font-size: 12px;
+}
+
+.language-label {
+    color: #586069;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.copy-button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.copy-button:hover {
+    background: #0056b3;
+}
+
+.code-block-container pre {
+    margin: 0;
+    padding: 12px;
+    background: #f8f9fa;
+    overflow-x: auto;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+/* Inline Code */
+.inline-code {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9em;
+}
+
+.markdown-message.response .inline-code {
+    background: #f1f3f4;
+    color: #d73a49;
+}
+
+/* Blockquotes */
+.custom-blockquote {
+    border-left: 4px solid #007bff;
+    margin: 12px 0;
+    padding: 8px 16px;
+    background: rgba(0, 123, 255, 0.1);
+    border-radius: 0 8px 8px 8px;
+    font-style: italic;
+}
+
+.markdown-message.prompt .custom-blockquote {
+    border-left-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Tables */
+.table-container {
+    overflow-x: auto;
+    margin: 12px 0;
+    border-radius: 8px;
+}
+
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.custom-table th,
+.custom-table td {
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.custom-table th {
+    background: #f6f8fa;
+    font-weight: 600;
+    color: #24292e;
+}
+
+.custom-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Lists */
+.markdown-ul, .markdown-ol {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.markdown-ul li, .markdown-ol li {
+    margin: 4px 0;
+    line-height: 1.5;
+}
+
+/* Links */
+.markdown-link {
+    color: #e1eefc;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+}
+
+.markdown-link:hover {
+    border-bottom-color: #a0f5b2;
+}
+
+.markdown-message.prompt .markdown-link {
+    color: #b3d7ff;
+}
+
+.markdown-message.prompt .markdown-link:hover {
+    border-bottom-color: #b3d7ff;
+}
+
+/* Message Time */
+.message-time {
+    display: block;
+    font-size: 11px;
+    opacity: 0.7;
+    margin-top: 8px;
+    text-align: right;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .markdown-message {
+        max-width: 90%;
+        font-size: 14px;
+    }
+
+    .code-block-container pre {
+        font-size: 12px;
+    }
+
+    .custom-table {
+        font-size: 12px;
+    }
+}
