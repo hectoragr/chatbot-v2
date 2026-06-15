@@ -8,4 +8,16 @@ describe('MarkdownMessage', () => {
     expect(screen.getByText('bold')).toBeInTheDocument();
     expect(screen.getByText('Jan 1')).toBeInTheDocument();
   });
+
+  it('renders a copy button and language label for a fenced code block', () => {
+    render(
+      <MarkdownMessage
+        content={'```js\nconst x = 1;\n```'}
+        type="response"
+        timestamp="Jan 1"
+      />,
+    );
+    expect(screen.getByRole('button', { name: /copy/i })).toBeInTheDocument();
+    expect(screen.getByText('js')).toBeInTheDocument();
+  });
 });

@@ -12,16 +12,14 @@ interface Props {
   timestamp: string;
 }
 
-// In react-markdown v10 the `code` component receives standard HTML code props
-// plus an optional `node`. Inline vs block is determined by checking whether
-// the parent node is a <pre> element.
-const CodeBlock: Components['code'] = ({ node, className, children, ...props }) => {
-  // A fenced block has its <code> as a direct child of a <pre> element.
-  const isBlock = node?.position !== undefined && (node as { tagName?: string }).tagName === 'code'
-    ? (node as unknown as { parent?: { tagName?: string } }).parent?.tagName === 'pre'
-    : false;
+// In react-markdown v10 the `code` component no longer receives an `inline`
+// prop, and hast nodes aren't doubly-linked (no `node.parent`). A fenced code
+// block is the only `code` that carries a `language-*` className, so matching
+// that className is both necessary and sufficient to identify it — this
+// replicates the original component's `!inline && match` condition.
+const CodeBlock: Components['code'] = ({ className, children, ...props }) => {
   const match = /language-(\w+)/.exec(className || '');
-  if (isBlock && match) {
+  if (match) {
     return (
       <div className="code-block-container">
         <div className="code-block-header">
