@@ -1151,7 +1151,9 @@ export const AUTO_BLOCK_TTL_SEC = 60 * 60; // 1 hour
 export async function recordHitAndMaybeBlock(ip: string): Promise<boolean> {
   const key = `burst:ip:${ip}:${Math.floor(Date.now() / 1000 / BURST_WINDOW_SEC)}`;
   const current = await loadRateLimit(key);
-  const count = current.count >= BURST_MAX ? current.count : await updateRateLimit(key, 1, BURST_WINDOW_SEC);
+  // Guard is `> BURST_MAX` (not `>=`) so the counter still increments through the
+  // BURST_MAX boundary and the `count > BURST_MAX` check below can actually fire.
+  const count = current.count > BURST_MAX ? current.count : await updateRateLimit(key, 1, BURST_WINDOW_SEC);
   if (count > BURST_MAX) {
     await addBlock(`ip:${ip}`, 'burst_auto', 'auto', AUTO_BLOCK_TTL_SEC);
     return true;
@@ -1179,7 +1181,7 @@ git commit -m "feat: block subjects + burst auto-block detection"
 **Goal:** Auth0 wired for the whole app (login/logout/session), server admin guard, and anon-id cookie issuance in middleware.
 
 **Files:**
-- Create: `app/api/auth/[auth0]/route.ts`, `lib/auth.ts`, `lib/anon.ts`, `middleware.ts`, `app/providers.tsx`
+- Create: `lib/auth0.ts`, `lib/auth.ts`, `lib/anon.ts`, `app/providers.tsx`; Modify: `middleware.ts` (compose Auth0 + anon cookie). No `app/api/auth/[auth0]/route.ts` (v4 middleware mounts `/auth/*`).
 - Modify: `app/layout.tsx`
 - Test: `lib/anon.test.ts`, `lib/auth.test.ts`
 
@@ -1248,6 +1250,10 @@ git commit -m "feat: anonymous ip + cookie helpers"
 import { NextResponse, type NextRequest } from 'next/server';
 import { randomUUID } from 'crypto';
 
+// Node runtime: middleware defaults to the Edge runtime in Next 15, which does
+// not provide Node's `crypto`. randomUUID() needs the Node runtime.
+export const runtime = 'nodejs';
+
 export function middleware(req: NextRequest) {
   const res = NextResponse.next();
   if (!req.cookies.get('anon_id')) {
@@ -1280,23 +1286,48 @@ git commit -m "feat: issue httpOnly anon_id cookie in middleware"
 
 ### Task 2.3: Auth0 SDK wiring + admin guard
 
-- [ ] **Step 1: Create the Auth0 client + route**
+- [ ] **Step 1: Create the lazy Auth0 client (v4.22.0) and compose middleware**
+
+In v4 the auth routes (`/auth/login`, `/auth/logout`, `/auth/callback`, `/auth/profile`, `/auth/access-token`) are mounted by the SDK **middleware** — there is NO `app/api/auth/[auth0]/route.ts`. `new Auth0Client()` reads env (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `APP_BASE_URL`) and throws if a required one is missing, so construct it lazily so build/test (run without env) don't throw.
 
 `lib/auth0.ts`:
 
 ```ts
 import { Auth0Client } from '@auth0/nextjs-auth0/server';
-export const auth0 = new Auth0Client();
+
+let _client: Auth0Client | null = null;
+
+// Lazily construct so importing this module doesn't require Auth0 env at build/test time.
+export function getAuth0(): Auth0Client {
+  if (!_client) _client = new Auth0Client();
+  return _client;
+}
 ```
 
-`app/api/auth/[auth0]/route.ts`:
+Replace `middleware.ts` (from Task 2.2) so the Auth0 middleware runs and the anon_id cookie is attached to its response. Use global `crypto.randomUUID()` (Web Crypto — Edge+Node), so no node `crypto` import / `runtime='nodejs'`:
 
 ```ts
-import { auth0 } from '@/lib/auth0';
-export const GET = auth0.middleware as never; // handled via middleware in v4
-```
+import { type NextRequest } from 'next/server';
+import { getAuth0 } from '@/lib/auth0';
 
-> Note: In `@auth0/nextjs-auth0` v4 the auth routes are served by the SDK middleware. If the installed version exposes `handleAuth()`, use `export const GET = handleAuth()` instead. Verify against the installed version's README before finalizing this file.
+export async function middleware(req: NextRequest) {
+  const res = await getAuth0().middleware(req); // mounts /auth/* + rolls session
+  if (!req.cookies.get('anon_id')) {
+    res.cookies.set('anon_id', crypto.randomUUID(), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+  return res;
+}
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+};
+```
 
 - [ ] **Step 2: Write `lib/auth.ts` (session + admin helpers) with a failing test**
 
@@ -1324,7 +1355,7 @@ Expected: FAIL — module not found.
 - [ ] **Step 4: Implement `lib/auth.ts`**
 
 ```ts
-import { auth0 } from './auth0.js';
+import { getAuth0 } from './auth0.js';
 
 export interface SessionUser {
   email: string;
@@ -1338,12 +1369,13 @@ export function isAdminEmail(email: string | undefined): boolean {
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
-  const session = await auth0.getSession();
-  if (!session?.user?.email) return null;
+  const session = await getAuth0().getSession();
+  // Require both email and sub so the returned SessionUser always satisfies its contract.
+  if (!session?.user?.email || !session.user.sub) return null;
   return {
-    email: session.user.email,
-    name: session.user.name,
-    sub: session.user.sub,
+    email: session.user.email as string,
+    name: session.user.name as string | undefined,
+    sub: session.user.sub as string,
   };
 }
 
@@ -1361,7 +1393,7 @@ export async function requireAdmin(): Promise<SessionUser> {
 Run: `npm test -- lib/auth.test.ts` → PASS.
 
 ```bash
-git add lib/auth0.ts lib/auth.ts lib/auth.test.ts app/api/auth
+git add lib/auth0.ts lib/auth.ts lib/auth.test.ts middleware.ts
 git commit -m "feat: Auth0 session helpers + admin guard"
 ```
 
