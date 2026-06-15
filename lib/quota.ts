@@ -82,10 +82,10 @@ export async function getQuotaStatus(s: QuotaSubject): Promise<QuotaStatus> {
 
   // approved: consume Token.limit first; when exhausted fall back to DAILY_TOKENS/day
   const tokenRemaining = u.token ? Math.max(0, u.token.limit - u.token.used) : 0;
-  if (tokenRemaining > 0) {
+  if (u.token && tokenRemaining > 0) {
     return {
-      tier, questionsUsed: 0, tokensUsed: u.token!.used,
-      maxQuestions: null, maxTokens: u.token!.limit,
+      tier, questionsUsed: 0, tokensUsed: u.token.used,
+      maxQuestions: null, maxTokens: u.token.limit,
       remainingTokens: tokenRemaining, remainingQuestions: null,
       blocked: false, resetsDaily: false,
     };
