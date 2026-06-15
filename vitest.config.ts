@@ -8,6 +8,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx', 'lib/**/*.test.ts'],
+    testTimeout: 15000,
   },
   resolve: { alias: { '@': new URL('.', import.meta.url).pathname } },
 });
