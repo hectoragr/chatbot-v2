@@ -18,13 +18,17 @@ export function SignupRequestForm() {
   const [status, setStatus] = useState<'idle' | 'ok' | 'error'>('idle');
 
   const submit = async () => {
-    const csrf = await getCsrf();
-    const r = await fetch('/api/requestToken', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-      body: JSON.stringify({ company, tokenLimit: Number(tokenLimit), provider: provider.value }),
-    });
-    setStatus(r.ok ? 'ok' : 'error');
+    try {
+      const csrf = await getCsrf();
+      const r = await fetch('/api/requestToken', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+        body: JSON.stringify({ company, tokenLimit: Number(tokenLimit), provider: provider.value }),
+      });
+      setStatus(r.ok ? 'ok' : 'error');
+    } catch {
+      setStatus('error'); // network / CSRF endpoint failure → surface to the user
+    }
   };
 
   return (
