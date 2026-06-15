@@ -51,10 +51,11 @@ const TABLE_NAMES = [
 
 // SSM parameter prefix for chatbot-v2 secrets
 // Populate before deploying:
+//   aws ssm put-parameter --name /chatbot-v2/prod/CSRF_SECRET         --value "..." --type SecureString
 //   aws ssm put-parameter --name /chatbot-v2/prod/AUTH0_SECRET         --value "..." --type SecureString
 //   aws ssm put-parameter --name /chatbot-v2/prod/AUTH0_CLIENT_ID      --value "..." --type String
 //   aws ssm put-parameter --name /chatbot-v2/prod/AUTH0_CLIENT_SECRET  --value "..." --type SecureString
-//   aws ssm put-parameter --name /chatbot-v2/prod/AUTH0_ISSUER_BASE_URL --value "https://..." --type String
+//   aws ssm put-parameter --name /chatbot-v2/prod/AUTH0_DOMAIN         --value "your-tenant.us.auth0.com" --type String
 //   aws ssm put-parameter --name /chatbot-v2/prod/OPENAI_API_KEY       --value "sk-..." --type SecureString
 //   aws ssm put-parameter --name /chatbot-v2/prod/DEEPSEEK_API_KEY     --value "sk-..." --type SecureString
 //   aws ssm put-parameter --name /chatbot-v2/prod/ADMIN_EMAIL          --value "..." --type String
@@ -197,11 +198,17 @@ export class ChatbotV2Stack extends cdk.Stack {
         // deployment region. Do NOT set it explicitly here.
         ADMIN_FN_NAME: adminFn.functionName,
         // TODO: populate these SSM params before deploying
+        // CSRF token signing secret — lib/csrf.ts falls back to an insecure
+        // default if this is unset, so it MUST be provided in production.
+        CSRF_SECRET: ssmParam('CSRF_SECRET'),
+        // Auth0 v4 SDK (@auth0/nextjs-auth0) reads AUTH0_DOMAIN + APP_BASE_URL
+        // (not the v3 AUTH0_ISSUER_BASE_URL / NEXTAUTH_URL names).
         AUTH0_SECRET: ssmParam('AUTH0_SECRET'),
         AUTH0_CLIENT_ID: ssmParam('AUTH0_CLIENT_ID'),
         AUTH0_CLIENT_SECRET: ssmParam('AUTH0_CLIENT_SECRET'),
-        AUTH0_ISSUER_BASE_URL: ssmParam('AUTH0_ISSUER_BASE_URL'),
-        NEXTAUTH_URL: domainName ? `https://${domainName}` : '',
+        AUTH0_DOMAIN: ssmParam('AUTH0_DOMAIN'),
+        AUTH0_SCOPE: 'openid profile email',
+        APP_BASE_URL: domainName ? `https://${domainName}` : '',
         OPENAI_API_KEY: ssmParam('OPENAI_API_KEY'),
         DEEPSEEK_API_KEY: ssmParam('DEEPSEEK_API_KEY'),
         ADMIN_EMAIL: ssmParam('ADMIN_EMAIL'),

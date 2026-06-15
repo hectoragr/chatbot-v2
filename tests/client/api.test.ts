@@ -33,8 +33,10 @@ describe('client api', () => {
 
   it('deleteConversation DELETEs the encoded id', async () => {
     const calls: string[] = [];
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => { calls.push(url); return { status: 200, json: async () => ({ valid: true }) } as Response; }));
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => { calls.push(url); return { status: 200, json: async () => ({ valid: true, token: 'CSRF123' }) } as Response; }));
     await deleteConversation('a b/c');
-    expect(calls[0]).toBe('/api/conversations/a%20b%2Fc');
+    // First fetches a CSRF token, then DELETEs the encoded id.
+    expect(calls).toContain('/api/csrf');
+    expect(calls).toContain('/api/conversations/a%20b%2Fc');
   });
 });

@@ -37,6 +37,10 @@ export async function sendCompletion(input: {
 }
 
 export async function deleteConversation(id: string) {
-  const r = await fetch(`/api/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const csrf = await getCsrf();
+  const r = await fetch(`/api/conversations/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { 'X-CSRF-Token': csrf },
+  });
   return { status: r.status, body: await r.json() };
 }

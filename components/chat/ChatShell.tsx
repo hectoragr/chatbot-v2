@@ -39,7 +39,7 @@ export function ChatShell() {
     (async () => {
       const me = await fetchMe();
       setAuthenticated(!!me.authenticated);
-      setQuota(me.quota);
+      setQuota(me.quota ?? EMPTY_QUOTA);
       if (me.authenticated) {
         const c = await fetchConversations();
         setConversations(c.conversations ?? []);
@@ -67,7 +67,7 @@ export function ChatShell() {
       if (authenticated) { const c = await fetchConversations(); setConversations(c.conversations ?? []); }
     }
     const me = await fetchMe();
-    setQuota(me.quota);
+    setQuota(me.quota ?? EMPTY_QUOTA);
   };
 
   const removeConvo = async (id: string) => {
