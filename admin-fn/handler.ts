@@ -5,6 +5,6 @@ export const handler = async (event: AdminOp) => {
     const result = await runAdminOp(event);
     return { ok: true, result };
   } catch (e) {
-    return { ok: false, error: (e as Error).message };
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 };

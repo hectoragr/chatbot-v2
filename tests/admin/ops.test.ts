@@ -17,10 +17,16 @@ describe('admin ops', () => {
     expect(res).toHaveProperty('blocks');
   });
   it('adds and removes a manual block', async () => {
-    const subject = `ip:7.7.7.${Math.floor(Math.random()*256)}`;
+    const subject = `ip:7.7.7.${Math.floor(Math.random() * 256)}`;
     await runAdminOp({ op: 'addBlock', payload: { subject, reason: 'manual-test' } });
+    // Confirm the block actually persisted (manual = permanent, no ttl).
+    const { findBlock } = await import('@/lib/blocks');
+    const hit = await findBlock([subject]);
+    expect(hit?.subject).toBe(subject);
+    expect(hit?.ttl).toBeUndefined();
     const after = await runAdminOp({ op: 'removeBlock', payload: { subject } }) as { removed: boolean };
     expect(after.removed).toBe(true);
+    expect(await findBlock([subject])).toBeNull();
   });
   it('rejects unknown op', async () => {
     await expect(runAdminOp({ op: 'nuke' as never, payload: {} as never })).rejects.toThrow();

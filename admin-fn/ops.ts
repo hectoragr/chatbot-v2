@@ -8,7 +8,7 @@ export type AdminOp =
   | { op: 'updateUser'; payload: { email: string; name?: string; company?: string } }
   | { op: 'deleteUser'; payload: { email: string } }
   | { op: 'addUser'; payload: { email: string; name?: string; company?: string } }
-  | { op: 'updateToken'; payload: { token: string; limit?: number; isActive?: boolean; provider?: string } }
+  | { op: 'updateToken'; payload: { token: string; limit?: number; isActive?: boolean; provider?: 'OPENAI' | 'DEEPSEEK' | 'ANY' } }
   | { op: 'deleteToken'; payload: { token: string } }
   | { op: 'approveToken'; payload: { tokenRequestId: string } }
   | { op: 'addBlock'; payload: { subject: string; reason: string } }
@@ -29,8 +29,10 @@ export async function runAdminOp(cmd: AdminOp): Promise<unknown> {
       return { deleted: await deleteUserById(cmd.payload.email) };
     case 'addUser':
       return { created: await createUserIfNotExists(cmd.payload.email, cmd.payload.name ?? cmd.payload.email, cmd.payload.email, cmd.payload.company ?? '') };
-    case 'updateToken':
-      return { updated: await updateToken(cmd.payload.token, cmd.payload as never) };
+    case 'updateToken': {
+      const { token, ...updates } = cmd.payload;
+      return { updated: await updateToken(token, updates) };
+    }
     case 'deleteToken':
       return { deleted: await deleteToken(cmd.payload.token) };
     case 'approveToken':
