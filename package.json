@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "build:opennext": "open-next build",
     "ddb:start": "docker compose up -d dynamodb",
     "ddb:bootstrap": "LOCAL_DDB=true DDB_ENDPOINT=http://localhost:8000 node scripts/bootstrap-ddb.mjs"
   },
@@ -39,6 +40,7 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@opennextjs/aws": "^4.0.3",
     "@playwright/test": "^1.56.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.6.0",
