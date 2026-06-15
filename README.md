@@ -37,7 +37,7 @@ Optional `.env.local` values:
 | Var | Effect when set | Effect when unset |
 |-----|-----------------|-------------------|
 | `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` | Real LLM completions | Completions return `[mocked completion]` — the chat still works fully offline |
-| `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `APP_BASE_URL` | Login / signup / `/admin` work | Anonymous chat works; `Log in` and `/admin` redirect to Auth0 and will error |
+| `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `APP_BASE_URL` | Login / signup / `/admin` work | **Anonymous-only mode** — anon chat works; the app skips Auth0 entirely. `Log in` / `/admin` are unavailable. (A misconfigured tenant also degrades to anon rather than crashing.) |
 | `ADMIN_EMAIL` | The Auth0 user with this email gets `/admin` access | No admin |
 | `CSRF_SECRET` | Signs CSRF tokens | Falls back to an insecure default (fine for local only) |
 
