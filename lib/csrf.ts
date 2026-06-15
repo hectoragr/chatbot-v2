@@ -37,5 +37,14 @@ export function verifyCSRFTokenValue(token: string | null): boolean {
     parsed = JSON.parse(Buffer.from(token, 'base64url').toString('utf-8'));
   } catch { return false; }
   if (!parsed?.payload || !parsed?.sig) return false;
-  return safeCompare(hmac(parsed.payload), parsed.sig);
+  if (!safeCompare(hmac(parsed.payload), parsed.sig)) return false;
+  // Enforce TTL: payload carries a millisecond `ts`. The client mints a fresh
+  // token immediately before each mutating request, so a 2-minute window is
+  // ample and bounds the replay surface of a leaked token.
+  try {
+    const { ts } = JSON.parse(parsed.payload) as { ts?: string };
+    const tsNum = Number(ts);
+    if (!Number.isFinite(tsNum) || Date.now() - tsNum > CSRF_TTL_MS) return false;
+  } catch { return false; }
+  return true;
 }
