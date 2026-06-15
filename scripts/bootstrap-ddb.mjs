@@ -32,7 +32,9 @@ const Tables = {
   Users: process.env.DDB_USERS || "Users", 
   Conversations: process.env.DDB_CONVERSATIONS || "Conversations",
   TokenRequests: process.env.DDB_TOKEN_REQUESTS || "TokenRequests",
-  RateLimits: process.env.DDB_RATELIMITS || "RateLimits"
+  RateLimits: process.env.DDB_RATELIMITS || "RateLimits",
+  Usage: process.env.DDB_USAGE || "Usage",
+  Blocks: process.env.DDB_BLOCKS || "Blocks"
 };
 
 async function ensureTable(params) {
@@ -47,7 +49,7 @@ async function ensureTable(params) {
 
 async function purgeAll() {
   const existing = await client.send(new ListTablesCommand({}));
-  for (const name of [Tables.Tokens, Tables.Users, Tables.Conversations, Tables.TokenRequests, Tables.RateLimits]) {
+  for (const name of [Tables.Tokens, Tables.Users, Tables.Conversations, Tables.TokenRequests, Tables.RateLimits, Tables.Usage, Tables.Blocks]) {
     if (existing.TableNames?.includes(name)) {
       await client.send(new DeleteTableCommand({ TableName: name }));
       console.log(`🗑️ Deleted: ${name}`);
@@ -166,6 +168,44 @@ async function createTables() {
     console.log(`➕ Created: ${Tables.RateLimits}`);
   } else {
     console.log(`✅ Table exists: ${Tables.RateLimits}`);
+  }
+
+  // Usage table (composite key + TTL)
+  if (!existing.TableNames?.includes(Tables.Usage)) {
+    await client.send(new CreateTableCommand({
+      TableName: Tables.Usage,
+      KeySchema: [
+        { AttributeName: "subject", KeyType: "HASH" },
+        { AttributeName: "period", KeyType: "RANGE" }
+      ],
+      AttributeDefinitions: [
+        { AttributeName: "subject", AttributeType: "S" },
+        { AttributeName: "period", AttributeType: "S" }
+      ],
+      TimeToLiveSpecification: { AttributeName: "ttl", Enabled: true },
+      BillingMode: "PAY_PER_REQUEST"
+    }));
+    console.log(`➕ Created: ${Tables.Usage}`);
+  } else {
+    console.log(`✅ Table exists: ${Tables.Usage}`);
+  }
+
+  // Blocks table (hash key + TTL)
+  if (!existing.TableNames?.includes(Tables.Blocks)) {
+    await client.send(new CreateTableCommand({
+      TableName: Tables.Blocks,
+      KeySchema: [
+        { AttributeName: "subject", KeyType: "HASH" }
+      ],
+      AttributeDefinitions: [
+        { AttributeName: "subject", AttributeType: "S" }
+      ],
+      TimeToLiveSpecification: { AttributeName: "ttl", Enabled: true },
+      BillingMode: "PAY_PER_REQUEST"
+    }));
+    console.log(`➕ Created: ${Tables.Blocks}`);
+  } else {
+    console.log(`✅ Table exists: ${Tables.Blocks}`);
   }
 }
 
