@@ -288,10 +288,24 @@ const nextConfig: NextConfig = {
     '@cloudscape-design/component-toolkit',
     '@cloudscape-design/global-styles',
   ],
+  // The lib/* modules use ESM `.js` import specifiers that point at `.ts` source
+  // (e.g. `import { ddb } from './ddb.js'`). tsc (bundler resolution) and vitest
+  // resolve these, but Next's webpack build needs an extensionAlias to map a
+  // `.js` specifier to the `.ts`/`.tsx` source. Without it, any route handler
+  // importing the DDB lib chain fails to build ("Can't resolve './usage.js'").
+  webpack: (config) => {
+    config.resolve.extensionAlias = {
+      '.js': ['.ts', '.tsx', '.js'],
+      '.mjs': ['.mts', '.mjs'],
+    };
+    return config;
+  },
 };
 
 export default nextConfig;
 ```
+
+> The `webpack` extensionAlias was added in Phase 3 (Task 3.3) — the first route handler to import the DDB lib chain — and is required by every DDB-backed route thereafter. It is shown here in the canonical config.
 
 `vitest.config.ts`:
 
@@ -552,7 +566,14 @@ export function verifyCSRFTokenValue(token: string | null): boolean {
     parsed = JSON.parse(Buffer.from(token, 'base64url').toString('utf-8'));
   } catch { return false; }
   if (!parsed?.payload || !parsed?.sig) return false;
-  return safeCompare(hmac(parsed.payload), parsed.sig);
+  if (!safeCompare(hmac(parsed.payload), parsed.sig)) return false;
+  // Enforce TTL: payload carries a millisecond `ts`; reject tokens older than CSRF_TTL_MS.
+  try {
+    const { ts } = JSON.parse(parsed.payload) as { ts?: string };
+    const tsNum = Number(ts);
+    if (!Number.isFinite(tsNum) || Date.now() - tsNum > CSRF_TTL_MS) return false;
+  } catch { return false; }
+  return true;
 }
 ```
 
@@ -817,10 +838,16 @@ process.env.AWS_REGION = 'us-east-1';
 
 const { getQuotaStatus, consumeQuota } = await import('./quota.js');
 
+// Unique-per-run identifiers: Usage rows persist across runs and anon quota blocks
+// on max(cookie, ip), so BOTH the anonId and the ip must be fresh each run.
+const uid = () => globalThis.crypto.randomUUID();
+const randIp = () =>
+  `${10 + Math.floor(Math.random() * 240)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`;
+
 describe('quota: anonymous', () => {
   it('blocks after 3 questions even under token cap', async () => {
-    const anonId = `q-${Date.now()}`;
-    const subject = { kind: 'anon' as const, anonId, ip: `1.2.3.${Date.now() % 255}` };
+    const anonId = `q-${uid()}`;
+    const subject = { kind: 'anon' as const, anonId, ip: randIp() };
     for (let i = 0; i < 3; i++) {
       const s = await getQuotaStatus(subject);
       expect(s.blocked).toBe(false);
@@ -832,8 +859,8 @@ describe('quota: anonymous', () => {
   });
 
   it('blocks when token cap hit before question cap', async () => {
-    const anonId = `tk-${Date.now()}`;
-    const subject = { kind: 'anon' as const, anonId, ip: `9.9.9.${Date.now() % 255}` };
+    const anonId = `tk-${uid()}`;
+    const subject = { kind: 'anon' as const, anonId, ip: randIp() };
     await consumeQuota(subject, 999);
     let s = await getQuotaStatus(subject);
     expect(s.blocked).toBe(false);
@@ -1144,7 +1171,9 @@ export const AUTO_BLOCK_TTL_SEC = 60 * 60; // 1 hour
 export async function recordHitAndMaybeBlock(ip: string): Promise<boolean> {
   const key = `burst:ip:${ip}:${Math.floor(Date.now() / 1000 / BURST_WINDOW_SEC)}`;
   const current = await loadRateLimit(key);
-  const count = current.count >= BURST_MAX ? current.count : await updateRateLimit(key, 1, BURST_WINDOW_SEC);
+  // Guard is `> BURST_MAX` (not `>=`) so the counter still increments through the
+  // BURST_MAX boundary and the `count > BURST_MAX` check below can actually fire.
+  const count = current.count > BURST_MAX ? current.count : await updateRateLimit(key, 1, BURST_WINDOW_SEC);
   if (count > BURST_MAX) {
     await addBlock(`ip:${ip}`, 'burst_auto', 'auto', AUTO_BLOCK_TTL_SEC);
     return true;
@@ -1172,7 +1201,7 @@ git commit -m "feat: block subjects + burst auto-block detection"
 **Goal:** Auth0 wired for the whole app (login/logout/session), server admin guard, and anon-id cookie issuance in middleware.
 
 **Files:**
-- Create: `app/api/auth/[auth0]/route.ts`, `lib/auth.ts`, `lib/anon.ts`, `middleware.ts`, `app/providers.tsx`
+- Create: `lib/auth0.ts`, `lib/auth.ts`, `lib/anon.ts`, `app/providers.tsx`; Modify: `middleware.ts` (compose Auth0 + anon cookie). No `app/api/auth/[auth0]/route.ts` (v4 middleware mounts `/auth/*`).
 - Modify: `app/layout.tsx`
 - Test: `lib/anon.test.ts`, `lib/auth.test.ts`
 
@@ -1241,6 +1270,10 @@ git commit -m "feat: anonymous ip + cookie helpers"
 import { NextResponse, type NextRequest } from 'next/server';
 import { randomUUID } from 'crypto';
 
+// Node runtime: middleware defaults to the Edge runtime in Next 15, which does
+// not provide Node's `crypto`. randomUUID() needs the Node runtime.
+export const runtime = 'nodejs';
+
 export function middleware(req: NextRequest) {
   const res = NextResponse.next();
   if (!req.cookies.get('anon_id')) {
@@ -1273,23 +1306,48 @@ git commit -m "feat: issue httpOnly anon_id cookie in middleware"
 
 ### Task 2.3: Auth0 SDK wiring + admin guard
 
-- [ ] **Step 1: Create the Auth0 client + route**
+- [ ] **Step 1: Create the lazy Auth0 client (v4.22.0) and compose middleware**
+
+In v4 the auth routes (`/auth/login`, `/auth/logout`, `/auth/callback`, `/auth/profile`, `/auth/access-token`) are mounted by the SDK **middleware** — there is NO `app/api/auth/[auth0]/route.ts`. `new Auth0Client()` reads env (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `APP_BASE_URL`) and throws if a required one is missing, so construct it lazily so build/test (run without env) don't throw.
 
 `lib/auth0.ts`:
 
 ```ts
 import { Auth0Client } from '@auth0/nextjs-auth0/server';
-export const auth0 = new Auth0Client();
+
+let _client: Auth0Client | null = null;
+
+// Lazily construct so importing this module doesn't require Auth0 env at build/test time.
+export function getAuth0(): Auth0Client {
+  if (!_client) _client = new Auth0Client();
+  return _client;
+}
 ```
 
-`app/api/auth/[auth0]/route.ts`:
+Replace `middleware.ts` (from Task 2.2) so the Auth0 middleware runs and the anon_id cookie is attached to its response. Use global `crypto.randomUUID()` (Web Crypto — Edge+Node), so no node `crypto` import / `runtime='nodejs'`:
 
 ```ts
-import { auth0 } from '@/lib/auth0';
-export const GET = auth0.middleware as never; // handled via middleware in v4
-```
+import { type NextRequest } from 'next/server';
+import { getAuth0 } from '@/lib/auth0';
 
-> Note: In `@auth0/nextjs-auth0` v4 the auth routes are served by the SDK middleware. If the installed version exposes `handleAuth()`, use `export const GET = handleAuth()` instead. Verify against the installed version's README before finalizing this file.
+export async function middleware(req: NextRequest) {
+  const res = await getAuth0().middleware(req); // mounts /auth/* + rolls session
+  if (!req.cookies.get('anon_id')) {
+    res.cookies.set('anon_id', crypto.randomUUID(), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+  return res;
+}
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+};
+```
 
 - [ ] **Step 2: Write `lib/auth.ts` (session + admin helpers) with a failing test**
 
@@ -1317,7 +1375,7 @@ Expected: FAIL — module not found.
 - [ ] **Step 4: Implement `lib/auth.ts`**
 
 ```ts
-import { auth0 } from './auth0.js';
+import { getAuth0 } from './auth0.js';
 
 export interface SessionUser {
   email: string;
@@ -1331,12 +1389,13 @@ export function isAdminEmail(email: string | undefined): boolean {
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
-  const session = await auth0.getSession();
-  if (!session?.user?.email) return null;
+  const session = await getAuth0().getSession();
+  // Require both email and sub so the returned SessionUser always satisfies its contract.
+  if (!session?.user?.email || !session.user.sub) return null;
   return {
-    email: session.user.email,
-    name: session.user.name,
-    sub: session.user.sub,
+    email: session.user.email as string,
+    name: session.user.name as string | undefined,
+    sub: session.user.sub as string,
   };
 }
 
@@ -1354,7 +1413,7 @@ export async function requireAdmin(): Promise<SessionUser> {
 Run: `npm test -- lib/auth.test.ts` → PASS.
 
 ```bash
-git add lib/auth0.ts lib/auth.ts lib/auth.test.ts app/api/auth
+git add lib/auth0.ts lib/auth.ts lib/auth.test.ts middleware.ts
 git commit -m "feat: Auth0 session helpers + admin guard"
 ```
 
@@ -1388,15 +1447,13 @@ export default i18n;
 'use client';
 import { Auth0Provider } from '@auth0/nextjs-auth0';
 import { I18nextProvider } from 'react-i18next';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { applyMode, Mode } from '@cloudscape-design/global-styles';
 import i18n from '@/i18n/config';
 
 export function Providers({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<Mode>(Mode.Light);
   useEffect(() => {
     const saved = (localStorage.getItem('appearance') as Mode) || Mode.Light;
-    setMode(saved);
     applyMode(saved);
   }, []);
   return (
@@ -1805,7 +1862,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 process.env.LOCAL_DDB = 'true';
 process.env.DDB_ENDPOINT = 'http://localhost:8000';
 process.env.AWS_REGION = 'us-east-1';
-process.env.NODE_ENV = 'test';
+// NODE_ENV is typed readonly in strict TS — cast to assign it in the test.
+(process.env as Record<string, string>).NODE_ENV = 'test';
 process.env.CSRF_SECRET = 'test_secret';
 
 vi.mock('@/lib/auth', () => ({ getSessionUser: vi.fn(async () => null), isAdminEmail: () => false }));
@@ -1814,23 +1872,28 @@ vi.mock('@/lib/providers', () => ({ runCompletion: vi.fn(async () => ({ content:
 const { POST } = await import('@/app/api/completions/route');
 const { generateCSRFToken } = await import('@/lib/csrf');
 
-function makeReq(anonId: string) {
+// Unique-per-run cookie + ip so persistent Usage rows from prior runs don't
+// pre-exhaust the anon quota (it blocks on max(cookie, ip)). Both stay fixed
+// across the 4 calls in a single test (same subject) but differ each run.
+const anonId = `c-${globalThis.crypto.randomUUID()}`;
+const ip = `10.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`;
+
+function makeReq() {
   const { token } = generateCSRFToken('http://x');
   return new Request('http://x/api/completions', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-csrf-token': token, 'x-forwarded-for': `7.7.7.${anonId.length}`, cookie: `anon_id=${anonId}` },
+    headers: { 'content-type': 'application/json', 'x-csrf-token': token, 'x-forwarded-for': ip, cookie: `anon_id=${anonId}` },
     body: JSON.stringify({ message: 'hello', provider: 'OPENAI', model: 'gpt-4o-mini' }),
   });
 }
 
 describe('completions anon quota', () => {
-  const anonId = `c-${Date.now()}`;
   it('allows first 3 then blocks with 402', async () => {
     for (let i = 0; i < 3; i++) {
-      const res = await POST(makeReq(anonId));
+      const res = await POST(makeReq());
       expect(res.status).toBe(200);
     }
-    const res = await POST(makeReq(anonId));
+    const res = await POST(makeReq());
     expect(res.status).toBe(402);
     const body = await res.json();
     expect(body.error).toBe('quota_exceeded');
@@ -2493,7 +2556,7 @@ export type AdminOp =
   | { op: 'updateUser'; payload: { email: string; name?: string; company?: string } }
   | { op: 'deleteUser'; payload: { email: string } }
   | { op: 'addUser'; payload: { email: string; name?: string; company?: string } }
-  | { op: 'updateToken'; payload: { token: string; limit?: number; isActive?: boolean; provider?: string } }
+  | { op: 'updateToken'; payload: { token: string; limit?: number; isActive?: boolean; provider?: 'OPENAI' | 'DEEPSEEK' | 'ANY' } }
   | { op: 'deleteToken'; payload: { token: string } }
   | { op: 'approveToken'; payload: { tokenRequestId: string } }
   | { op: 'addBlock'; payload: { subject: string; reason: string } }
@@ -2513,8 +2576,10 @@ export async function runAdminOp(cmd: AdminOp): Promise<unknown> {
       return { deleted: await deleteUserById(cmd.payload.email) };
     case 'addUser':
       return { created: await createUserIfNotExists(cmd.payload.email, cmd.payload.name ?? cmd.payload.email, cmd.payload.email, cmd.payload.company ?? '') };
-    case 'updateToken':
-      return { updated: await updateToken(cmd.payload.token, cmd.payload as never) };
+    case 'updateToken': {
+      const { token, ...updates } = cmd.payload;
+      return { updated: await updateToken(token, updates) };
+    }
     case 'deleteToken':
       return { deleted: await deleteToken(cmd.payload.token) };
     case 'approveToken':
@@ -2541,7 +2606,7 @@ export const handler = async (event: AdminOp) => {
     const result = await runAdminOp(event);
     return { ok: true, result };
   } catch (e) {
-    return { ok: false, error: (e as Error).message };
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 };
 ```
@@ -2887,12 +2952,15 @@ Run: `npm install -D @opennextjs/aws`
 
 - [ ] **Step 2: Create `open-next.config.ts`**
 
+Installed `@opennextjs/aws@4.0.3` uses the plain default-export config (the CLI binary is `open-next`):
+
 ```ts
-import { defineCloudfrontCompatibleConfig } from '@opennextjs/aws/config';
-export default defineCloudfrontCompatibleConfig({});
+import type { OpenNextConfig } from '@opennextjs/aws/types/open-next.js';
+const config = { default: {} } satisfies OpenNextConfig;
+export default config;
 ```
 
-> If the installed `@opennextjs/aws` version uses the plain `{ default: {} }` config shape instead of `defineCloudfrontCompatibleConfig`, follow its README. The build command is `npx open-next build`, which emits `.open-next/` (server function, asset bundle, image-optimization function).
+> The build command is `open-next build` (added as the `build:opennext` npm script), which runs `next build` then emits `.open-next/` with `server-functions/default/`, `assets/`, `image-optimization-function/`, `revalidation-function/`, etc. The type import path is `@opennextjs/aws/types/open-next.js` (the package's `./*` export glob maps it to `dist/types/open-next.d.ts`).
 
 - [ ] **Step 3: Verify the OpenNext build**
 

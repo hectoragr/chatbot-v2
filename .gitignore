@@ -9,3 +9,5 @@ dist/
 infra/cdk.out/
 test-results/
 playwright-report/
+tsconfig.tsbuildinfo
+*.tsbuildinfo
