@@ -15,5 +15,6 @@ export function json(body: unknown, status = 200): Response {
 }
 
 export function fail(message: string, extra: Record<string, unknown> = {}): Response {
-  return json({ error: message, ...extra }, errorStatus(message));
+  // Spread extra first so the canonical error message can't be shadowed by a caller.
+  return json({ ...extra, error: message }, errorStatus(message));
 }
