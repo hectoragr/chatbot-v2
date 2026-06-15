@@ -1862,7 +1862,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 process.env.LOCAL_DDB = 'true';
 process.env.DDB_ENDPOINT = 'http://localhost:8000';
 process.env.AWS_REGION = 'us-east-1';
-process.env.NODE_ENV = 'test';
+// NODE_ENV is typed readonly in strict TS — cast to assign it in the test.
+(process.env as Record<string, string>).NODE_ENV = 'test';
 process.env.CSRF_SECRET = 'test_secret';
 
 vi.mock('@/lib/auth', () => ({ getSessionUser: vi.fn(async () => null), isAdminEmail: () => false }));
