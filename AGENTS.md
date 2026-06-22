@@ -141,14 +141,69 @@ files. Mock `fetch` for client/component tests. Playwright e2e in `tests/e2e/`
 
 ## Deploy
 
-`.github/workflows/deploy.yml`: on push, runs lint→typecheck→test, then builds
-the OpenNext bundle and `cdk deploy`. Infra (`infra/lib/chatbot-v2-stack.ts`):
-admin Lambda, S3 assets bucket, CloudFront distribution, optional ACM cert +
-Route53 record when `domainName` is set. DynamoDB tables are provisioned outside
-this stack.
+**Production:** https://chat.hectoragomez.com — AWS account `628835453302`,
+region `us-east-1`, CloudFormation stack `ChatbotV2Stack` (CDK in `infra/`).
+
+### CI/CD (automatic)
+Push to `main` → `.github/workflows/deploy.yml`:
+1. **build-test** — lint → typecheck → test. Runs a `dynamodb-local` service
+   container; a bootstrap step (`ddb:bootstrap`, pinned `AWS_REGION=us-east-1`)
+   creates the tables the integration tests need.
+2. **deploy** (only on push to `main`) — builds the OpenNext bundle, then
+   `cdk deploy`. Auth is GitHub OIDC: role `chatbot-v2-gha-deploy` (trusts
+   `repo:hectoragr/chatbot-v2:*`, can assume the CDK bootstrap roles), passed
+   via repo secret `AWS_DEPLOY_ROLE_ARN`. No long-lived AWS keys.
+
+So shipping a feature = merge to `main`. The pipeline deploys it.
+
+### Manual deploy (when needed)
+```bash
+APP_BASE_URL=https://chat.hectoragomez.com npm run build:opennext
+cd infra && CDK_DEFAULT_ACCOUNT=628835453302 npx cdk deploy --require-approval never --no-rollback
+```
+Use `--no-rollback` so a mid-deploy failure keeps resources (the assets bucket
+has `RemovalPolicy.RETAIN`, so a rollback orphans it and the next deploy 409s on
+bucket-already-exists — delete it first if that happens).
+
+### What the stack creates (`infra/lib/chatbot-v2-stack.ts`)
+Server Lambda (`chatbot-v2-server`, scoped DDB role), admin Lambda
+(`chatbot-v2-admin`, full DDB role), S3 assets bucket, CloudFront distribution,
+ACM cert + Route53 A record (`domainName` in `infra/bin/app.ts`). It **imports**
+the 7 DynamoDB tables by name — they are NOT created here (run `ddb:bootstrap`
+against the target account once; for prod they predate the stack).
+
+### Secrets (SSM)
+8 params under `/chatbot-v2/prod/`: `CSRF_SECRET`, `AUTH0_SECRET`,
+`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `OPENAI_API_KEY`,
+`DEEPSEEK_API_KEY`, `ADMIN_EMAIL`. They MUST be **String** type — the stack reads
+them with `valueForStringParameter`, which can't resolve `SecureString`
+(deploy fails "types not supported by CloudFormation"). Tradeoff: plaintext at
+rest, IAM-gated. Upgrade path: runtime SSM fetch in the Lambda.
+
+Changing an SSM value does NOT trigger a redeploy (no template diff) and the
+Lambda has values baked at deploy time — after editing a secret, either force a
+deploy or patch the `chatbot-v2-server` Lambda env directly to apply it.
+
+### Deploy gotchas (all hit + fixed during initial cutover)
+- **Assets**: deploy them to the **bucket root** (no prefix). OpenNext requests
+  `/_next/*`; a prefix → 403 → broken hydration/CSS.
+- **CI DynamoDB**: the service container has no `-sharedDb`, so it partitions by
+  region+creds. Bootstrap must use the same region as the tests (`us-east-1`).
+- **Route53**: CDK `ARecord` does CREATE not UPSERT — a pre-existing external
+  record blocks deploy; delete it first.
+- **Custom-domain CNAME**: only one CloudFront distribution may own an alias;
+  free it from the old one before claiming it.
+- **Dynamic routes**: server components that read the session (cookies/headers),
+  e.g. `app/admin/layout.tsx`, need `export const dynamic = 'force-dynamic'` or
+  they 500 with a static→dynamic conflict on Lambda.
+- **Server role**: needs `dynamodb:Scan` on **Tokens** (subject resolution scans
+  by `user_id`; Tokens has no GSI for it).
+- OpenNext logs benign `NoSuchBucket`/`EROFS` ISR-cache warnings — no cache
+  bucket is wired; harmless for this dynamic app.
 
 ## Environment variables
 
-See `.env.example`. Key ones: `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, the `AUTH0_*`
-set, `ADMIN_EMAIL` (single admin), `SES_FROM_EMAIL`, `CSRF_SECRET`,
-`ADMIN_FN_NAME` (set by infra). `LOCAL_DDB`/`DDB_ENDPOINT` for local dev.
+Local dev: see `.env.example` — `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, the
+`AUTH0_*` set, `ADMIN_EMAIL` (single admin), `SES_FROM_EMAIL`, `CSRF_SECRET`,
+`LOCAL_DDB`/`DDB_ENDPOINT`. In prod these come from SSM (above); `ADMIN_FN_NAME`
+is set by infra.
