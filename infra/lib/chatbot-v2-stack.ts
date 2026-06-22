@@ -170,6 +170,19 @@ export class ChatbotV2Stack extends cdk.Stack {
       }),
     );
 
+    // Statement 2b: Scan ONLY on the Tokens table.
+    // Subject resolution (lib/subject.ts → listTokens) scans Tokens filtered by
+    // user_id; the table has no GSI on user_id, so Scan is required here.
+    const tokensTable = tables[TABLE_NAMES.indexOf('Tokens')];
+    serverFnRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'DdbScanTokensOnly',
+        effect: iam.Effect.ALLOW,
+        actions: ['dynamodb:Scan'],
+        resources: [tokensTable.tableArn],
+      }),
+    );
+
     // Statement 3: InvokeFunction ONLY on admin-fn
     serverFnRole.addToPolicy(
       new iam.PolicyStatement({
