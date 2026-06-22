@@ -14,6 +14,13 @@ jobs:
   build-test:
     name: Lint, typecheck & test
     runs-on: ubuntu-latest
+    # Some tests are integration tests that hit a local DynamoDB at
+    # localhost:8000 (LOCAL_DDB). Provide it as a service container.
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:latest
+        ports:
+          - 8000:8000
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +31,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Bootstrap local DynamoDB tables
+        run: npm run ddb:bootstrap
 
       - name: Lint
         run: npm run lint

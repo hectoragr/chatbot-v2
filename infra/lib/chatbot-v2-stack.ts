@@ -234,7 +234,8 @@ export class ChatbotV2Stack extends cdk.Stack {
         ),
       ],
       destinationBucket: assetsBucket,
-      destinationKeyPrefix: '_assets',
+      // OpenNext serves static assets at /_next/* and public files at root, so
+      // deploy to the bucket root (no prefix) to match the request paths.
       prune: false,
     });
 
@@ -268,10 +269,9 @@ export class ChatbotV2Stack extends cdk.Stack {
     const serverOrigin = new origins.FunctionUrlOrigin(serverFnUrl);
 
     // CloudFront distribution
-    // Simplified behaviours:
-    //   /_next/*  → S3 (versioned static files)
-    //   _assets/* → S3 (OpenNext places assets under _assets/)
-    //   *         → server Lambda (default behaviour)
+    // Behaviours:
+    //   /_next/* → S3 (versioned static files, served at bucket root)
+    //   *        → server Lambda (default behaviour)
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultBehavior: {
         origin: serverOrigin,
@@ -282,11 +282,6 @@ export class ChatbotV2Stack extends cdk.Stack {
       },
       additionalBehaviors: {
         '/_next/*': {
-          origin: s3Origin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
-        },
-        '_assets/*': {
           origin: s3Origin,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
