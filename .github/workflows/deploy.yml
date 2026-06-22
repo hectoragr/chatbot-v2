@@ -34,6 +34,11 @@ jobs:
 
       - name: Bootstrap local DynamoDB tables
         run: npm run ddb:bootstrap
+        # The CI dynamodb-local has no -sharedDb, so it partitions tables by
+        # region+creds. Tests run in us-east-1, so bootstrap must match (the
+        # script otherwise defaults to us-west-2).
+        env:
+          AWS_REGION: us-east-1
 
       - name: Lint
         run: npm run lint
