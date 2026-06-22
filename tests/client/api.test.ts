@@ -14,7 +14,7 @@ describe('client api', () => {
   it('fetchModels hits /api/models and returns the catalog', async () => {
     mockFetch(() => ({ models: { OPENAI: [{ id: 'gpt-4o', label: 'GPT-4o' }] } }));
     const m = await fetchModels();
-    expect(m.OPENAI[0].id).toBe('gpt-4o');
+    expect(m.models.OPENAI[0].id).toBe('gpt-4o');
   });
 
   it('sendCompletion fetches a CSRF token then POSTs to /api/completions with the header', async () => {

@@ -45,6 +45,7 @@ export type UserDoc = {
   auth0_sub?: string;
   approved?: boolean;
   dailyLimit?: number; // default 1000
+  pendingDelete?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -65,6 +66,7 @@ export type ConversationDoc = {
   updatedAt: string;
   provider: 'OPENAI' | 'DEEPSEEK' | 'ANY';
   messages: Message[];
+  hidden?: boolean;
 };
 
 // Optional: type for RateLimits table (handy for debugging)
@@ -79,6 +81,7 @@ export type TokenRequestDoc = {
   user_id: string;
   name: string;
   processed: boolean;
+  denied?: boolean;
   createdAt: string;
   updatedAt: string;
   provider: 'OPENAI' | 'DEEPSEEK' | 'ANY';

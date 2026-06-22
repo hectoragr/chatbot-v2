@@ -3,8 +3,7 @@ import { adminInvoke } from '@/lib/adminInvoke';
 import { verifyCSRFTokenValue } from '@/lib/csrf';
 import { json, adminDeny } from '@/lib/http';
 import { loadTokenRequest } from '@/lib/tokens';
-import { notifyRequesterApproved } from '@/lib/email';
-import type { TokenDoc } from '@/lib/ddb';
+import { notifyRequesterDenied } from '@/lib/email';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!verifyCSRFTokenValue(req.headers.get('x-csrf-token'))) return json({ error: 'CSRF_TOKEN_INVALID' }, 403);
@@ -12,17 +11,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     await requireAdmin();
     const { id } = await params;
     const tokenReq = await loadTokenRequest(id);
-    const result = await adminInvoke({ op: 'approveToken', payload: { tokenRequestId: id } }) as TokenDoc;
+    const result = await adminInvoke({ op: 'denyToken', payload: { tokenRequestId: id } });
     if (tokenReq) {
-      const appUrl = process.env.APP_BASE_URL || '';
-      await notifyRequesterApproved({
-        requesterEmail: tokenReq.user_id,
-        requesterName: tokenReq.name,
-        appUrl,
-        token: result.token,
-      });
+      await notifyRequesterDenied({ requesterEmail: tokenReq.user_id, requesterName: tokenReq.name });
     }
-    return json({ valid: true, token: result });
+    return json({ valid: true, result });
   } catch (e) {
     return adminDeny((e as Error).message);
   }

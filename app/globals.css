@@ -1,2 +1,321 @@
 html, body { margin: 0; padding: 0; height: 100%; }
 body { min-height: 100%; }
+
+/* Matrix theme overrides — applied via data-theme="matrix" on <html> */
+[data-theme="matrix"] {
+  --matrix-green: #00ff41;
+  --matrix-dark-green: #003b00;
+  --matrix-bg: #000000;
+}
+
+[data-theme="matrix"] body,
+[data-theme="matrix"] #__next,
+[data-theme="matrix"] main {
+  background-color: var(--matrix-bg) !important;
+  color: var(--matrix-green) !important;
+  font-family: 'Courier New', Courier, monospace !important;
+}
+
+/* Cloudscape surface overrides */
+[data-theme="matrix"] [class*="awsui_root"],
+[data-theme="matrix"] [class*="awsui_content-wrapper"],
+[data-theme="matrix"] [class*="awsui_navigation"],
+[data-theme="matrix"] [class*="awsui_tools"] {
+  background-color: #001a00 !important;
+  color: var(--matrix-green) !important;
+  font-family: 'Courier New', Courier, monospace !important;
+}
+
+[data-theme="matrix"] [class*="awsui_header"],
+[data-theme="matrix"] h1, [data-theme="matrix"] h2, [data-theme="matrix"] h3 {
+  color: var(--matrix-green) !important;
+  font-family: 'Courier New', Courier, monospace !important;
+}
+
+[data-theme="matrix"] [class*="awsui_container"] {
+  background-color: #001a00 !important;
+  border-color: var(--matrix-green) !important;
+}
+
+[data-theme="matrix"] [class*="awsui_button"][class*="awsui_variant-primary"] {
+  background-color: var(--matrix-dark-green) !important;
+  border-color: var(--matrix-green) !important;
+  color: var(--matrix-green) !important;
+}
+
+[data-theme="matrix"] [class*="awsui_button"] {
+  color: var(--matrix-green) !important;
+  font-family: 'Courier New', Courier, monospace !important;
+}
+
+[data-theme="matrix"] [class*="awsui_textarea"],
+[data-theme="matrix"] textarea {
+  background-color: #001a00 !important;
+  color: var(--matrix-green) !important;
+  border-color: var(--matrix-green) !important;
+  font-family: 'Courier New', Courier, monospace !important;
+  caret-color: var(--matrix-green);
+}
+
+[data-theme="matrix"] [class*="awsui_navigation-container"] a,
+[data-theme="matrix"] [class*="awsui_link"] {
+  color: var(--matrix-green) !important;
+}
+
+[data-theme="matrix"] [class*="awsui_side-navigation"] {
+  background-color: #001a00 !important;
+}
+
+[data-theme="matrix"] [class*="awsui_select"] button,
+[data-theme="matrix"] [class*="awsui_trigger"] {
+  background-color: #001a00 !important;
+  color: var(--matrix-green) !important;
+  border-color: var(--matrix-green) !important;
+}
+
+/* Code / message content in matrix */
+[data-theme="matrix"] pre, [data-theme="matrix"] code {
+  background-color: #001a00 !important;
+  color: #39ff14 !important;
+  font-family: 'Courier New', Courier, monospace !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Tokyo Night theme — inspired by the popular VS Code theme
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="tokyo-night"] {
+  --tn-bg: #1a1b26;
+  --tn-surface: #24283b;
+  --tn-fg: #a9b1d6;
+  --tn-accent: #7aa2f7;
+  --tn-accent2: #bb9af7;
+  --tn-border: #414868;
+  --tn-green: #9ece6a;
+  --tn-red: #f7768e;
+}
+
+[data-theme="tokyo-night"] body,
+[data-theme="tokyo-night"] #__next,
+[data-theme="tokyo-night"] main {
+  background-color: var(--tn-bg) !important;
+  color: var(--tn-fg) !important;
+}
+
+[data-theme="tokyo-night"] [class*="awsui_root"],
+[data-theme="tokyo-night"] [class*="awsui_content-wrapper"],
+[data-theme="tokyo-night"] [class*="awsui_navigation"],
+[data-theme="tokyo-night"] [class*="awsui_tools"] {
+  background-color: var(--tn-bg) !important;
+  color: var(--tn-fg) !important;
+}
+
+[data-theme="tokyo-night"] [class*="awsui_header"],
+[data-theme="tokyo-night"] h1, [data-theme="tokyo-night"] h2, [data-theme="tokyo-night"] h3 {
+  color: var(--tn-accent) !important;
+}
+
+[data-theme="tokyo-night"] [class*="awsui_container"] {
+  background-color: var(--tn-surface) !important;
+  border-color: var(--tn-border) !important;
+}
+
+[data-theme="tokyo-night"] [class*="awsui_button"][class*="awsui_variant-primary"] {
+  background-color: var(--tn-accent) !important;
+  border-color: var(--tn-accent) !important;
+  color: var(--tn-bg) !important;
+}
+
+[data-theme="tokyo-night"] [class*="awsui_button"] {
+  color: var(--tn-accent) !important;
+}
+
+[data-theme="tokyo-night"] [class*="awsui_textarea"],
+[data-theme="tokyo-night"] textarea {
+  background-color: var(--tn-surface) !important;
+  color: var(--tn-fg) !important;
+  border-color: var(--tn-border) !important;
+  caret-color: var(--tn-accent);
+}
+
+[data-theme="tokyo-night"] [class*="awsui_navigation-container"] a,
+[data-theme="tokyo-night"] [class*="awsui_link"] {
+  color: var(--tn-accent2) !important;
+}
+
+[data-theme="tokyo-night"] [class*="awsui_side-navigation"] {
+  background-color: var(--tn-surface) !important;
+}
+
+[data-theme="tokyo-night"] [class*="awsui_select"] button,
+[data-theme="tokyo-night"] [class*="awsui_trigger"] {
+  background-color: var(--tn-surface) !important;
+  color: var(--tn-fg) !important;
+  border-color: var(--tn-border) !important;
+}
+
+[data-theme="tokyo-night"] pre, [data-theme="tokyo-night"] code {
+  background-color: var(--tn-bg) !important;
+  color: var(--tn-green) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Solarized Dark theme — Ethan Schoonover's iconic color scheme
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="solarized-dark"] {
+  --sol-base03: #002b36;
+  --sol-base02: #073642;
+  --sol-base01: #586e75;
+  --sol-base0: #839496;
+  --sol-base1: #93a1a1;
+  --sol-yellow: #b58900;
+  --sol-orange: #cb4b16;
+  --sol-red: #dc322f;
+  --sol-blue: #268bd2;
+  --sol-cyan: #2aa198;
+  --sol-green: #859900;
+  --sol-violet: #6c71c4;
+}
+
+[data-theme="solarized-dark"] body,
+[data-theme="solarized-dark"] #__next,
+[data-theme="solarized-dark"] main {
+  background-color: var(--sol-base03) !important;
+  color: var(--sol-base0) !important;
+}
+
+[data-theme="solarized-dark"] [class*="awsui_root"],
+[data-theme="solarized-dark"] [class*="awsui_content-wrapper"],
+[data-theme="solarized-dark"] [class*="awsui_navigation"],
+[data-theme="solarized-dark"] [class*="awsui_tools"] {
+  background-color: var(--sol-base03) !important;
+  color: var(--sol-base0) !important;
+}
+
+[data-theme="solarized-dark"] [class*="awsui_header"],
+[data-theme="solarized-dark"] h1, [data-theme="solarized-dark"] h2, [data-theme="solarized-dark"] h3 {
+  color: var(--sol-blue) !important;
+}
+
+[data-theme="solarized-dark"] [class*="awsui_container"] {
+  background-color: var(--sol-base02) !important;
+  border-color: var(--sol-base01) !important;
+}
+
+[data-theme="solarized-dark"] [class*="awsui_button"][class*="awsui_variant-primary"] {
+  background-color: var(--sol-blue) !important;
+  border-color: var(--sol-blue) !important;
+  color: var(--sol-base03) !important;
+}
+
+[data-theme="solarized-dark"] [class*="awsui_button"] {
+  color: var(--sol-cyan) !important;
+}
+
+[data-theme="solarized-dark"] [class*="awsui_textarea"],
+[data-theme="solarized-dark"] textarea {
+  background-color: var(--sol-base02) !important;
+  color: var(--sol-base0) !important;
+  border-color: var(--sol-base01) !important;
+  caret-color: var(--sol-cyan);
+}
+
+[data-theme="solarized-dark"] [class*="awsui_navigation-container"] a,
+[data-theme="solarized-dark"] [class*="awsui_link"] {
+  color: var(--sol-cyan) !important;
+}
+
+[data-theme="solarized-dark"] [class*="awsui_side-navigation"] {
+  background-color: var(--sol-base02) !important;
+}
+
+[data-theme="solarized-dark"] [class*="awsui_select"] button,
+[data-theme="solarized-dark"] [class*="awsui_trigger"] {
+  background-color: var(--sol-base02) !important;
+  color: var(--sol-base0) !important;
+  border-color: var(--sol-base01) !important;
+}
+
+[data-theme="solarized-dark"] pre, [data-theme="solarized-dark"] code {
+  background-color: var(--sol-base03) !important;
+  color: var(--sol-green) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Solarized Light theme — the light variant of Solarized
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="solarized-light"] {
+  --soll-base3: #fdf6e3;
+  --soll-base2: #eee8d5;
+  --soll-base1: #93a1a1;
+  --soll-base00: #657b83;
+  --soll-base01: #586e75;
+  --soll-yellow: #b58900;
+  --soll-blue: #268bd2;
+  --soll-cyan: #2aa198;
+  --soll-green: #859900;
+  --soll-violet: #6c71c4;
+}
+
+[data-theme="solarized-light"] body,
+[data-theme="solarized-light"] #__next,
+[data-theme="solarized-light"] main {
+  background-color: var(--soll-base3) !important;
+  color: var(--soll-base00) !important;
+}
+
+[data-theme="solarized-light"] [class*="awsui_root"],
+[data-theme="solarized-light"] [class*="awsui_content-wrapper"],
+[data-theme="solarized-light"] [class*="awsui_navigation"],
+[data-theme="solarized-light"] [class*="awsui_tools"] {
+  background-color: var(--soll-base3) !important;
+  color: var(--soll-base00) !important;
+}
+
+[data-theme="solarized-light"] [class*="awsui_header"],
+[data-theme="solarized-light"] h1, [data-theme="solarized-light"] h2, [data-theme="solarized-light"] h3 {
+  color: var(--soll-blue) !important;
+}
+
+[data-theme="solarized-light"] [class*="awsui_container"] {
+  background-color: var(--soll-base2) !important;
+  border-color: var(--soll-base1) !important;
+}
+
+[data-theme="solarized-light"] [class*="awsui_button"][class*="awsui_variant-primary"] {
+  background-color: var(--soll-blue) !important;
+  border-color: var(--soll-blue) !important;
+  color: var(--soll-base3) !important;
+}
+
+[data-theme="solarized-light"] [class*="awsui_button"] {
+  color: var(--soll-blue) !important;
+}
+
+[data-theme="solarized-light"] [class*="awsui_textarea"],
+[data-theme="solarized-light"] textarea {
+  background-color: var(--soll-base2) !important;
+  color: var(--soll-base00) !important;
+  border-color: var(--soll-base1) !important;
+  caret-color: var(--soll-blue);
+}
+
+[data-theme="solarized-light"] [class*="awsui_navigation-container"] a,
+[data-theme="solarized-light"] [class*="awsui_link"] {
+  color: var(--soll-cyan) !important;
+}
+
+[data-theme="solarized-light"] [class*="awsui_side-navigation"] {
+  background-color: var(--soll-base2) !important;
+}
+
+[data-theme="solarized-light"] [class*="awsui_select"] button,
+[data-theme="solarized-light"] [class*="awsui_trigger"] {
+  background-color: var(--soll-base2) !important;
+  color: var(--soll-base00) !important;
+  border-color: var(--soll-base1) !important;
+}
+
+[data-theme="solarized-light"] pre, [data-theme="solarized-light"] code {
+  background-color: var(--soll-base2) !important;
+  color: var(--soll-green) !important;
+}

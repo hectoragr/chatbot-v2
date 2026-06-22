@@ -8,7 +8,7 @@ export const DAILY_TOKENS = 1000;
 
 export type QuotaSubject =
   | { kind: 'anon'; anonId: string; ip: string }
-  | { kind: 'user'; email: string; approved: boolean; token?: TokenDoc };
+  | { kind: 'user'; email: string; approved: boolean; token?: TokenDoc; tokens?: TokenDoc[] };
 
 export type Tier = 'anon' | 'unapproved' | 'approved';
 export type BlockReason = 'questions_exhausted' | 'tokens_exhausted';
@@ -28,8 +28,12 @@ export interface QuotaStatus {
 
 function tierOf(s: QuotaSubject): Tier {
   if (s.kind === 'anon') return 'anon';
-  if (s.approved && s.token && (s.token.limit - s.token.used) > 0) return 'approved';
-  return s.approved ? 'approved' : 'unapproved';
+  // approved if any active token has remaining room
+  const u = s as Extract<QuotaSubject, { kind: 'user' }>;
+  const allTokens = u.tokens ?? (u.token ? [u.token] : []);
+  const hasRoom = allTokens.some((t) => t.isActive && (t.limit - t.used) > 0);
+  if (u.approved && hasRoom) return 'approved';
+  return u.approved ? 'approved' : 'unapproved';
 }
 
 // Anonymous: block if EITHER the cookie subject OR the ip subject is exhausted.
@@ -67,7 +71,6 @@ export async function getQuotaStatus(s: QuotaSubject): Promise<QuotaStatus> {
   const u = s as Extract<QuotaSubject, { kind: 'user' }>;
 
   if (tier === 'unapproved') {
-    // 1000 tokens/day; resets daily once exhausted. Keyed by today's period.
     const used = await getUsage(`user:${u.email}`, todayPeriod());
     return {
       tier, questionsUsed: used.questions, tokensUsed: used.tokens,
@@ -80,13 +83,18 @@ export async function getQuotaStatus(s: QuotaSubject): Promise<QuotaStatus> {
     };
   }
 
-  // approved: consume Token.limit first; when exhausted fall back to DAILY_TOKENS/day
-  const tokenRemaining = u.token ? Math.max(0, u.token.limit - u.token.used) : 0;
-  if (u.token && tokenRemaining > 0) {
+  // approved: accumulate ALL active tokens first; fall back to DAILY_TOKENS/day when all exhausted
+  const allTokens = u.tokens ?? (u.token ? [u.token] : []);
+  const activeTokens = allTokens.filter((t) => t.isActive);
+  const totalRemaining = activeTokens.reduce((sum, t) => sum + Math.max(0, t.limit - t.used), 0);
+  const totalLimit = activeTokens.reduce((sum, t) => sum + t.limit, 0);
+  const totalUsed = activeTokens.reduce((sum, t) => sum + t.used, 0);
+
+  if (activeTokens.length > 0 && totalRemaining > 0) {
     return {
-      tier, questionsUsed: 0, tokensUsed: u.token.used,
-      maxQuestions: null, maxTokens: u.token.limit,
-      remainingTokens: tokenRemaining, remainingQuestions: null,
+      tier, questionsUsed: 0, tokensUsed: totalUsed,
+      maxQuestions: null, maxTokens: totalLimit,
+      remainingTokens: totalRemaining, remainingQuestions: null,
       blocked: false, resetsDaily: false,
     };
   }
@@ -103,9 +111,6 @@ export async function getQuotaStatus(s: QuotaSubject): Promise<QuotaStatus> {
 }
 
 // Record consumption of one question + `tokens` against the right ledger.
-// Approved users whose Token still has room are charged on the Token by the
-// caller (incrementTokenUsed); this only writes the Usage ledger for the
-// anon / unapproved / approved-daily ledgers.
 export async function consumeQuota(s: QuotaSubject, tokens: number): Promise<void> {
   if (s.kind === 'anon') {
     const period = todayPeriod();
@@ -120,9 +125,10 @@ export async function consumeQuota(s: QuotaSubject, tokens: number): Promise<voi
     await addUsage(`user:${s.email}`, todayPeriod(), 1, tokens);
     return;
   }
-  // approved with token room → charged on Token elsewhere; only ledger daily once token empty
-  const tokenRemaining = s.token ? Math.max(0, s.token.limit - s.token.used) : 0;
-  if (tokenRemaining <= 0) {
+  // approved with token room → charged on Token by caller; only ledger daily once all tokens empty
+  const allTokens = s.tokens ?? (s.token ? [s.token] : []);
+  const totalRemaining = allTokens.filter(t => t.isActive).reduce((sum, t) => sum + Math.max(0, t.limit - t.used), 0);
+  if (totalRemaining <= 0) {
     await addUsage(`user:${s.email}`, todayPeriod(), 1, tokens);
   }
 }

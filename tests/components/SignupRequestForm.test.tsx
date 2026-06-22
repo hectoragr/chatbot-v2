@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import '@/i18n/config';
 import { SignupRequestForm } from '@/components/auth/SignupRequestForm';
 
 describe('SignupRequestForm', () => {

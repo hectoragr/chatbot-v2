@@ -8,8 +8,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ email: s
   try {
     await requireAdmin();
     const { email } = await params;
-    const { name, company } = await req.json();
-    const result = await adminInvoke({ op: 'updateUser', payload: { email: decodeURIComponent(email), name, company } });
+    const { name, company, approved } = await req.json();
+    const result = await adminInvoke({ op: 'updateUser', payload: { email: decodeURIComponent(email), name, company, approved } });
     return json({ valid: true, user: result });
   } catch (e) { return adminDeny((e as Error).message); }
 }

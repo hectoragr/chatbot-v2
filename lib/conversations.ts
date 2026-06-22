@@ -9,6 +9,18 @@ export async function getConversation(conversation_id: string) {
   return out.Item as ConversationDoc | undefined;
 }
 
+export async function getConversationsByUser(user_id: string): Promise<ConversationDoc[]> {
+  if (!user_id) return [];
+  const out = await ddb().send(new QueryCommand({
+    TableName: TABLES.Conversations,
+    IndexName: 'byUserCreatedAt',
+    KeyConditionExpression: 'user_id = :pk',
+    ExpressionAttributeValues: { ':pk': user_id },
+    ScanIndexForward: false,
+  }));
+  return ((out.Items as ConversationDoc[]) || []).filter((c) => !c.hidden);
+}
+
 export async function getConversationsByUserAndToken(user_id: string, token: string): Promise<ConversationDoc[]> {
   if (!user_id || !token) return [];
   const out = await ddb().send(new QueryCommand({
@@ -161,6 +173,16 @@ export async function deleteByTokenAndUser(token: string, user_id: string) {
       RequestItems: { [TABLES.Conversations]: chunk.map((it) => ({ DeleteRequest: { Key: { conversation_id: it.conversation_id } } })) },
     }));
   }
+}
+
+export async function hideConversation(conversation_id: string) {
+  await ddb().send(new UpdateCommand({
+    TableName: TABLES.Conversations,
+    Key: { conversation_id },
+    UpdateExpression: 'SET #h = :t, #u = :now',
+    ExpressionAttributeNames: { '#h': 'hidden', '#u': 'updatedAt' },
+    ExpressionAttributeValues: { ':t': true, ':now': new Date().toISOString() },
+  }));
 }
 
 export async function deleteConversation(conversation_id: string) {

@@ -4,13 +4,14 @@ import { getQuotaStatus, consumeQuota } from '@/lib/quota';
 import { ensureConversation, getConversation, appendMessages, renameConversation, runSmallModelForSummary } from '@/lib/conversations';
 import { runCompletion } from '@/lib/providers';
 import { incrementTokenUsed } from '@/lib/tokens';
-import { isValidModel, defaultModel, type Provider } from '@/lib/models';
+import { isValidModel, defaultModel, providerForModel, type Provider } from '@/lib/models';
 import { verifyCSRFTokenValue } from '@/lib/csrf';
 import { clientIp } from '@/lib/anon';
 import { findBlock, blockSubjects } from '@/lib/blocks';
 import { recordHitAndMaybeBlock } from '@/lib/abuse';
 import { json, fail } from '@/lib/http';
 import type { Message } from '@/lib/ddb';
+import { selectTokenForProvider } from './selectTokenForProvider';
 
 export async function POST(req: Request) {
   if (!verifyCSRFTokenValue(req.headers.get('x-csrf-token'))) {
@@ -53,25 +54,30 @@ export async function POST(req: Request) {
     const result = await runCompletion(provider, chosenModel, history);
     const cost = result.estimatedTokens;
 
-    // Enforce token ceiling for this single call.
-    if (cost > pre.remainingTokens) {
-      return json({ error: 'quota_exceeded', tier: pre.tier, reason: 'tokens_exhausted', remaining: pre.remainingTokens }, 402);
-    }
-
     const assistantMsg: Message = { role: 'assistant', content: result.content, createdAt: new Date().toISOString() };
 
     // Charge: approved-with-token-room → charge the Token; everyone else → Usage ledger.
+    // Cap cost to remaining tokens — the completion already happened, so deliver the response.
+    const chargeAmount = Math.min(cost, pre.remainingTokens);
     if (subject.kind === 'user' && subject.approved && subject.token && (subject.token.limit - subject.token.used) > 0) {
-      await incrementTokenUsed(subject.token.token, cost);
+      // Multi-token quota fix: Select token based on provider match.
+      // Priority: 1) Exact provider match, 2) 'ANY' provider, 3) Best token fallback
+      const allTokens = subject.tokens ?? (subject.token ? [subject.token] : []);
+      const tokenToCharge = selectTokenForProvider(allTokens, provider, chosenModel) ?? subject.token;
+      await incrementTokenUsed(tokenToCharge.token, chargeAmount);
     } else {
-      await consumeQuota(subject, cost);
+      await consumeQuota(subject, chargeAmount);
     }
 
     if (convo) {
       if (conversationId !== convo.conversation_id) {
-        const title = await runSmallModelForSummary(userMsg.content, assistantMsg.content);
-        await renameConversation(convo.conversation_id, title);
-        convo = (await getConversation(convo.conversation_id))!;
+        try {
+          const title = await runSmallModelForSummary(userMsg.content, assistantMsg.content);
+          await renameConversation(convo.conversation_id, title);
+          convo = (await getConversation(convo.conversation_id))!;
+        } catch (e) {
+          console.error('[completions] rename failed:', (e as Error).message);
+        }
       }
       await appendMessages(convo.conversation_id, [userMsg, assistantMsg]);
     }

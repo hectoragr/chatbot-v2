@@ -12,6 +12,12 @@ async function approve(token: string, onRefresh: () => void) {
   onRefresh();
 }
 
+async function deny(token: string, onRefresh: () => void) {
+  const csrf = await getCsrf();
+  await fetch(`/api/admin/denyToken/${encodeURIComponent(token)}`, { method: 'PUT', headers: { 'X-CSRF-Token': csrf } });
+  onRefresh();
+}
+
 export function TokenRequestsTable({ items, onRefresh }: { items: TokenRequestDoc[]; onRefresh: () => void }) {
   return (
     <Table
@@ -28,9 +34,15 @@ export function TokenRequestsTable({ items, onRefresh }: { items: TokenRequestDo
           id: 'actions',
           header: '',
           cell: (r) => (
-            <Button variant="inline-link" onClick={() => approve(r.token, onRefresh)}>
-              Approve
-            </Button>
+            <>
+              <Button variant="inline-link" onClick={() => approve(r.token, onRefresh)}>
+                Approve
+              </Button>
+              {' '}
+              <Button variant="inline-link" onClick={() => deny(r.token, onRefresh)}>
+                Deny
+              </Button>
+            </>
           ),
         },
       ]}

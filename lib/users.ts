@@ -1,4 +1,4 @@
-import { GetCommand, PutCommand, DeleteCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, PutCommand, DeleteCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 
 import { ddb, TABLES } from './ddb.js';
 
@@ -26,7 +26,7 @@ export async function createUserIfNotExists(user_id: string, name: string, email
   }
 }
 
-export async function updateUser(user_id: string, name?: string, email?: string, company?: string): Promise<UserDoc | null> {
+export async function updateUser(user_id: string, name?: string, email?: string, company?: string, approved?: boolean): Promise<UserDoc | null> {
   const db = ddb();
   const existing = await getUserById(user_id);
   if (!existing) return null;
@@ -35,6 +35,7 @@ export async function updateUser(user_id: string, name?: string, email?: string,
     name: name || existing.name,
     email: email || existing.email,
     company: company || existing.company,
+    ...(typeof approved === 'boolean' ? { approved } : {}),
     updatedAt: new Date().toISOString(),
   };
   await db.send(new PutCommand({
@@ -64,6 +65,16 @@ export async function deleteUserById(user_id: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function markPendingDelete(user_id: string): Promise<void> {
+  const db = ddb();
+  await db.send(new UpdateCommand({
+    TableName: TABLES.Users,
+    Key: { user_id },
+    UpdateExpression: 'SET pendingDelete = :t, updatedAt = :now',
+    ExpressionAttributeValues: { ':t': true, ':now': new Date().toISOString() },
+  }));
 }
 
 export async function listUsers(limit: number = 100): Promise<UserDoc[]> {

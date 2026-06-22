@@ -3,6 +3,7 @@ import { createTokenRequestMaxThreeTokens } from '@/lib/tokens';
 import { createUserIfNotExists } from '@/lib/users';
 import { verifyCSRFTokenValue } from '@/lib/csrf';
 import { json, fail } from '@/lib/http';
+import { notifyAdminTokenRequest } from '@/lib/email';
 import type { Provider } from '@/lib/models';
 
 export async function POST(req: Request) {
@@ -21,6 +22,16 @@ export async function POST(req: Request) {
     const reqDoc = await createTokenRequestMaxThreeTokens(
       user.email, name ?? user.name ?? user.email, provider as Provider, limit, company ?? '',
     );
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (adminEmail) {
+      await notifyAdminTokenRequest({
+        adminEmail,
+        requesterEmail: user.email,
+        requesterName: name ?? user.name ?? user.email,
+        provider,
+        limit,
+      });
+    }
     return json({ valid: true, token: reqDoc.token, message: 'Request submitted for admin approval.' });
   } catch (e) {
     return fail((e as Error)?.message);

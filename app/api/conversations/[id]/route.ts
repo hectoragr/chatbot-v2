@@ -1,5 +1,5 @@
 import { getSessionUser } from '@/lib/auth';
-import { getConversation, deleteConversation } from '@/lib/conversations';
+import { getConversation, hideConversation } from '@/lib/conversations';
 import { verifyCSRFTokenValue } from '@/lib/csrf';
 import { json, fail } from '@/lib/http';
 
@@ -23,7 +23,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const convo = await getConversation(id);
     if (!convo) return json({ error: 'conversation not found' }, 404);
     if (convo.user_id !== user.email) return json({ error: 'forbidden' }, 403);
-    await deleteConversation(id);
+    await hideConversation(id);
     return json({ valid: true, conversationId: id });
   } catch (e) {
     return fail((e as Error)?.message);

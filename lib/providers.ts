@@ -5,10 +5,14 @@ import type { Message as ChatMessage } from './ddb.js';
 type ProviderResult = { content: string; estimatedTokens: number };
 
 const approxTokens = (s: string) => Math.max(1, Math.ceil((s || '').length / 4));
-const mapMsgs = (msgs: ChatMessage[], systemMessage?: string) => {
-  const messages = msgs.map((m) => ({ role: m.role, content: m.content }));
+
+/** OpenAI reasoning models (o1*, o3*) use 'developer' instead of 'system' and don't support temperature. */
+const isReasoningModel = (model: string) => model.startsWith('o1') || model.startsWith('o3');
+
+const mapMsgs = (msgs: ChatMessage[], systemMessage?: string, useDevRole = false) => {
+  const messages: { role: string; content: string }[] = msgs.map((m) => ({ role: m.role, content: m.content }));
   if (systemMessage) {
-    messages.unshift({ role: 'system', content: systemMessage });
+    messages.unshift({ role: useDevRole ? 'developer' : 'system', content: systemMessage });
   }
   return messages;
 };
@@ -25,6 +29,7 @@ export async function runCompletion(
   try {
     if (provider === 'OPENAI' && process.env.OPENAI_API_KEY) {
       const mdl = model || process.env.OPENAI_MODEL || 'gpt-4.1-nano';
+      const reasoning = isReasoningModel(mdl);
       let systemMessage: string | undefined;
       let temperature = 0.2;
 
@@ -33,16 +38,27 @@ export async function runCompletion(
         ({ system: systemMessage, temperature } = prompt);
       }
 
+      const body: Record<string, unknown> = {
+        model: mdl,
+        messages: mapMsgs(messages, systemMessage, reasoning),
+      };
+
+      // Reasoning models don't support temperature
+      if (!reasoning) {
+        body.temperature = temperature;
+      }
+
       const r = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-        body: JSON.stringify({
-          model: mdl,
-          messages: mapMsgs(messages, systemMessage),
-          temperature,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await r.json();
+      if (!r.ok || data?.error) {
+        console.error(`[providers] OpenAI ${mdl} error:`, JSON.stringify(data?.error ?? data));
+        const errMsg = data?.error?.message ?? 'OpenAI API error';
+        return { content: `⚠️ ${errMsg}`, estimatedTokens: promptToks };
+      }
       const content = data?.choices?.[0]?.message?.content ?? '';
       return { content, estimatedTokens: promptToks + approxTokens(content) };
     }
@@ -54,6 +70,11 @@ export async function runCompletion(
         body: JSON.stringify({ model: mdl, messages: mapMsgs(messages), temperature: 0.2 }),
       });
       const data = await r.json();
+      if (!r.ok || data?.error) {
+        console.error(`[providers] DeepSeek ${mdl} error:`, JSON.stringify(data?.error ?? data));
+        const errMsg = data?.error?.message ?? 'DeepSeek API error';
+        return { content: `⚠️ ${errMsg}`, estimatedTokens: promptToks };
+      }
       const content = data?.choices?.[0]?.message?.content ?? '';
       return { content, estimatedTokens: promptToks + approxTokens(content) };
     }

@@ -11,7 +11,7 @@ export interface QuotaStatusDTO {
 
 export async function fetchModels() {
   const r = await fetch('/api/models');
-  return (await r.json()).models as Record<string, { id: string; label: string }[]>;
+  return (await r.json()) as { models: Record<string, { id: string; label: string }[]>; allModels: { id: string; provider: string; label: string; description: string; costPer1kTokens: number }[] };
 }
 
 export async function fetchMe() {

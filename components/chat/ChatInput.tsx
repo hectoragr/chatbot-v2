@@ -1,9 +1,10 @@
 'use client';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Textarea from '@cloudscape-design/components/textarea';
 import Button from '@cloudscape-design/components/button';
 import SpaceBetween from '@cloudscape-design/components/space-between';
-import { ModelSelector } from './ModelSelector';
+import { ModelPicker } from './ModelPicker';
 import { EmojiPickerButton } from './EmojiPickerButton';
 import { QuotaBanner } from './QuotaBanner';
 import type { QuotaStatusDTO } from '@/lib/client/api';
@@ -11,12 +12,15 @@ import type { QuotaStatusDTO } from '@/lib/client/api';
 interface Props {
   provider: string;
   model: string;
-  onModelChange: (id: string) => void;
+  onModelChange: (provider: string, modelId: string) => void;
   onSend: (message: string) => void;
   quota: QuotaStatusDTO;
+  pendingApproval?: boolean;
+  providerRemaining?: Record<string, number>;
 }
 
-export function ChatInput({ provider, model, onModelChange, onSend, quota }: Props) {
+export function ChatInput({ model, onModelChange, onSend, quota, pendingApproval, providerRemaining }: Props) {
+  const { t } = useTranslation();
   const [value, setValue] = useState('');
   const disabled = quota.blocked;
   const submit = () => {
@@ -26,9 +30,9 @@ export function ChatInput({ provider, model, onModelChange, onSend, quota }: Pro
   };
   return (
     <SpaceBetween size="xs">
-      <QuotaBanner quota={quota} />
+      <QuotaBanner quota={quota} pendingApproval={pendingApproval} providerRemaining={providerRemaining} />
       <SpaceBetween size="xs" direction="horizontal">
-        <ModelSelector provider={provider} value={model} onChange={onModelChange} />
+        <ModelPicker modelId={model} onChange={onModelChange} providerRemaining={providerRemaining} />
         <EmojiPickerButton disabled={disabled} onSelect={(e) => setValue((v) => v + e)} />
       </SpaceBetween>
       <Textarea
@@ -36,10 +40,10 @@ export function ChatInput({ provider, model, onModelChange, onSend, quota }: Pro
         disabled={disabled}
         onChange={({ detail }) => setValue(detail.value)}
         onKeyDown={({ detail }) => { if (detail.key === 'Enter' && !detail.shiftKey) submit(); }}
-        placeholder="Type your message here..."
+        placeholder={t('typeMessage')}
         rows={3}
       />
-      <Button variant="primary" disabled={disabled} ariaLabel="Send" onClick={submit}>Send</Button>
+      <Button variant="primary" disabled={disabled} ariaLabel={t('send')} onClick={submit}>{t('send')}</Button>
     </SpaceBetween>
   );
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import '@/i18n/config';
 import { QuotaBanner } from '@/components/chat/QuotaBanner';
 
 describe('QuotaBanner', () => {

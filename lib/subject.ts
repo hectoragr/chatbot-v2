@@ -12,10 +12,12 @@ export async function resolveSubject(req: Request): Promise<QuotaSubject> {
   }
   const userDoc = await getUserById(user.email);
   const approved = !!userDoc?.approved;
-  // pick the user's active token with the most remaining, if any
-  const tokens = (await listTokens(user.email, 10)) as TokenDoc[];
-  const active = tokens
-    .filter((t) => t.isActive)
-    .sort((a, b) => (b.limit - b.used) - (a.limit - a.used))[0];
-  return { kind: 'user', email: user.email, approved, token: active };
+  const allTokens = (await listTokens(user.email, 20)) as TokenDoc[];
+  const activeTokens = allTokens.filter((t) => t.isActive);
+  // Pick the token with most remaining quota as the "best" token.
+  // NOTE: subject.token is the default/fallback for charging, but the actual
+  // token charged may differ based on provider-aware selection in
+  // selectTokenForProvider() (exact provider match > 'ANY' > best fallback).
+  const best = [...activeTokens].sort((a, b) => (b.limit - b.used) - (a.limit - a.used))[0];
+  return { kind: 'user', email: user.email, approved, token: best, tokens: activeTokens };
 }

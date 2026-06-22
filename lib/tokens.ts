@@ -134,6 +134,22 @@ export async function createTokenIfNotExists(tokenReq: TokenDocReq): Promise<Tok
   }
 }
 
+export async function denyTokenRequest(token: string): Promise<TokenRequestDoc> {
+  const db = ddb();
+  const now = new Date().toISOString();
+  const req = await loadTokenRequest(token);
+  if (!req) throw new Error('TOKEN_REQUEST_NOT_FOUND');
+  if (req.processed) throw new Error('TOKEN_REQUEST_ALREADY_PROCESSED');
+  await db.send(new UpdateCommand({
+    TableName: TABLES.TokenRequests,
+    Key: { token: req.token },
+    UpdateExpression: 'SET #processed = :t, #denied = :t, updatedAt = :now',
+    ExpressionAttributeNames: { '#processed': 'processed', '#denied': 'denied' },
+    ExpressionAttributeValues: { ':t': true, ':now': now },
+  }));
+  return { ...req, processed: true, denied: true, updatedAt: now };
+}
+
 export async function transformTokenRequestToToken(token: string): Promise<TokenDoc> {
   const db = ddb();
   const now = new Date().toISOString();
@@ -264,6 +280,26 @@ export async function toggleTokenActive(tokenStr: string, isActive: boolean): Pr
     return true;
   } catch {
     return false;
+  }
+}
+
+export async function deleteAllUserTokens(email: string): Promise<void> {
+  const tokens = await listTokens(email, 100);
+  for (const t of tokens) {
+    await deleteToken(t.token);
+  }
+}
+
+export async function deleteAllUserTokenRequests(email: string): Promise<void> {
+  const db = ddb();
+  const out = await db.send(new ScanCommand({
+    TableName: TABLES.TokenRequests,
+    FilterExpression: 'user_id = :uid',
+    ExpressionAttributeValues: { ':uid': email },
+  }));
+  const items = (out.Items || []) as TokenRequestDoc[];
+  for (const item of items) {
+    await db.send(new DeleteCommand({ TableName: TABLES.TokenRequests, Key: { token: item.token } }));
   }
 }
 

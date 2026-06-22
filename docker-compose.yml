@@ -6,3 +6,11 @@ services:
       - "8000:8000"
     command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
     restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mailpit-local
+    ports:
+      - "8025:8025"   # Web UI — view emails at http://localhost:8025
+      - "1025:1025"   # SMTP — app sends emails here
+    restart: unless-stopped
