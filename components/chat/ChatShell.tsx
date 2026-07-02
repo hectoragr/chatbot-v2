@@ -127,7 +127,7 @@ export function ChatShell() {
   return (
     <>
       <Modal visible={requestOpen} onDismiss={() => setRequestOpen(false)} header={t('requestTokens')}>
-        <SignupRequestForm />
+        <SignupRequestForm key={String(requestOpen)} onDone={() => setRequestOpen(false)} />
       </Modal>
       <AppLayout
         navigationHide={!authenticated}
