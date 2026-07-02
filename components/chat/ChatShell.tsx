@@ -15,7 +15,6 @@ import { ChatInput } from './ChatInput';
 import { SettingsPanel } from './SettingsPanel';
 import { SignupRequestForm } from '@/components/auth/SignupRequestForm';
 import { fetchMe, fetchConversations, sendCompletion, deleteConversation } from '@/lib/client/api';
-import { providerForModel } from '@/lib/models';
 import { conversationToMarkdown, conversationToJson, safeFilename, downloadFile } from '@/lib/client/exportConversation';
 import type { QuotaStatusDTO } from '@/lib/client/api';
 
@@ -64,6 +63,7 @@ export function ChatShell() {
     ]);
     setActiveId(tempId);
     setMessages([]);
+    setLastAutoModel(null);
   };
 
   const selectConvo = (id: string) => {
@@ -71,6 +71,7 @@ export function ChatShell() {
     const c = conversations.find((x) => x.conversation_id === id);
     setActiveId(id);
     setMessages(c?.messages ?? []);
+    setLastAutoModel(null);
   };
 
   const onSend = async (text: string) => {
@@ -114,6 +115,7 @@ export function ChatShell() {
   const handleModelChange = (newProvider: string, newModel: string) => {
     setProvider(newProvider);
     setModel(newModel);
+    setLastAutoModel(null);
   };
 
   const exportActive = (format: string) => {

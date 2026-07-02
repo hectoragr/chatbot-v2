@@ -21,6 +21,9 @@ export async function POST(req: Request) {
   try {
     const { message, conversationId, provider, model } = await req.json();
     if (!message || !provider) return json({ error: 'message and provider required' }, 400);
+    if (model !== undefined && typeof model !== 'string') return json({ error: 'invalid model' }, 400);
+    if (provider !== 'AUTO' && provider !== 'OPENAI' && provider !== 'DEEPSEEK') return json({ error: 'invalid provider' }, 400);
+    if (provider === 'AUTO' && model !== 'auto') return json({ error: 'invalid model for AUTO provider' }, 400);
 
     const subject = await resolveSubject(req);
 
@@ -46,7 +49,20 @@ export async function POST(req: Request) {
     let effectiveProvider = provider as Provider;
     let effectiveModel = model;
     if (model === 'auto') {
-      effectiveModel = await pickModelForMessage(String(message));
+      // Provider-aware: an approved user with token room can only be billed on
+      // the provider(s) their tokens cover. 'ANY' covers both. Users billed via
+      // the Usage ledger (anon/unapproved/token-exhausted) are provider-agnostic.
+      let allowedProviders: Provider[] | undefined;
+      if (subject.kind === 'user' && subject.approved && subject.token && (subject.token.limit - subject.token.used) > 0) {
+        const tokensWithRoom = (subject.tokens ?? []).filter((t) => t.isActive && (t.limit - t.used) > 0);
+        const providers = new Set(tokensWithRoom.map((t) => t.provider));
+        if (providers.has('ANY')) {
+          allowedProviders = ['OPENAI', 'DEEPSEEK'];
+        } else {
+          allowedProviders = [...providers] as Provider[];
+        }
+      }
+      effectiveModel = await pickModelForMessage(String(message), allowedProviders);
       effectiveProvider = providerForModel(effectiveModel);
     }
     const chosenModel = isValidModel(effectiveProvider, effectiveModel) ? effectiveModel : defaultModel(effectiveProvider);

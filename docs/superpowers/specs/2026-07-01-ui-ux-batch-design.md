@@ -36,6 +36,20 @@ Response gains `modelUsed: string` so the UI can display which model answered.
 **Tests** — `lib/autoModel.test.ts` (mocked provider call: each tier, garbage
 output, thrown error) + completions route test for the auto path.
 
+**Provider-aware selection** — auto mode must not route an approved token
+holder to a provider they can't be billed on. For an approved user with token
+room, the route computes the set of providers covered by their active tokens
+(a token with provider `'ANY'` counts as covering both `OPENAI` and
+`DEEPSEEK`) and passes it to `pickModelForMessage` as `allowedProviders`; the
+tier's cheapest candidate on an allowed provider is chosen, falling back to
+the tier's primary (default) candidate if none of the user's tokens cover it.
+Users billed via the Usage ledger (anonymous, unapproved, or approved users
+who've exhausted all token room) are provider-agnostic, so they get the
+default tier mapping unchanged. Note that the classification call itself
+always runs on the app's own OpenAI key (`gpt-4.1-nano`) after the quota/abuse
+gates and is never charged against the user's quota — this is deliberate, so
+classification cost is absorbed by the app rather than the user.
+
 ## 2. Copy buttons on messages
 
 `components/chat/MarkdownMessage.tsx`: add Cloudscape `CopyToClipboard`
