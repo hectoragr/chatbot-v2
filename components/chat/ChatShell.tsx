@@ -6,6 +6,7 @@ import ContentLayout from '@cloudscape-design/components/content-layout';
 import Header from '@cloudscape-design/components/header';
 import Container from '@cloudscape-design/components/container';
 import Button from '@cloudscape-design/components/button';
+import ButtonDropdown from '@cloudscape-design/components/button-dropdown';
 import Modal from '@cloudscape-design/components/modal';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import { ConversationList } from './ConversationList';
@@ -15,6 +16,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { SignupRequestForm } from '@/components/auth/SignupRequestForm';
 import { fetchMe, fetchConversations, sendCompletion, deleteConversation } from '@/lib/client/api';
 import { providerForModel } from '@/lib/models';
+import { conversationToMarkdown, conversationToJson, safeFilename, downloadFile } from '@/lib/client/exportConversation';
 import type { QuotaStatusDTO } from '@/lib/client/api';
 
 interface Msg { role: 'user' | 'assistant' | 'system'; content: string; createdAt: string; }
@@ -114,8 +116,22 @@ export function ChatShell() {
     setModel(newModel);
   };
 
+  const exportActive = (format: string) => {
+    const name = conversations.find((c) => c.conversation_id === activeId)?.displayName ?? 'conversation';
+    const convo = { displayName: name, messages };
+    if (format === 'md') downloadFile(`${safeFilename(name)}.md`, conversationToMarkdown(convo), 'text/markdown');
+    else downloadFile(`${safeFilename(name)}.json`, conversationToJson(convo), 'application/json');
+  };
+
   const headerActions = (
     <SpaceBetween direction="horizontal" size="xs">
+      <ButtonDropdown
+        items={[{ id: 'md', text: t('exportMarkdown') }, { id: 'json', text: t('exportJson') }]}
+        disabled={messages.length === 0}
+        onItemClick={({ detail }) => exportActive(detail.id)}
+      >
+        {t('export')}
+      </ButtonDropdown>
       <Button onClick={() => setToolsOpen((o) => !o)} iconName="settings">{t('settings')}</Button>
       {authenticated
         ? <Button onClick={() => setRequestOpen(true)}>{t('requestTokens')}</Button>

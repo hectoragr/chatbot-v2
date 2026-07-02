@@ -91,7 +91,12 @@ export const resources = {
       // Copy Message
       "copyMessage": "Copy message",
       "copied": "Copied",
-      "copyFailed": "Copy failed"
+      "copyFailed": "Copy failed",
+
+      // Export
+      "export": "Export",
+      "exportMarkdown": "Markdown (.md)",
+      "exportJson": "JSON (.json)"
     }
   },
   es: {
@@ -185,7 +190,12 @@ export const resources = {
       // Copy Message
       "copyMessage": "Copiar mensaje",
       "copied": "Copiado",
-      "copyFailed": "Error al copiar"
+      "copyFailed": "Error al copiar",
+
+      // Export
+      "export": "Exportar",
+      "exportMarkdown": "Markdown (.md)",
+      "exportJson": "JSON (.json)"
     }
   },
   fr: {
@@ -280,7 +290,12 @@ export const resources = {
       // Copy Message
       "copyMessage": "Copier le message",
       "copied": "Copié",
-      "copyFailed": "Échec de la copie"
+      "copyFailed": "Échec de la copie",
+
+      // Export
+      "export": "Exporter",
+      "exportMarkdown": "Markdown (.md)",
+      "exportJson": "JSON (.json)"
     }
   },
   de: {
@@ -375,7 +390,12 @@ export const resources = {
       // Copy Message
       "copyMessage": "Nachricht kopieren",
       "copied": "Kopiert",
-      "copyFailed": "Kopieren fehlgeschlagen"
+      "copyFailed": "Kopieren fehlgeschlagen",
+
+      // Export
+      "export": "Exportieren",
+      "exportMarkdown": "Markdown (.md)",
+      "exportJson": "JSON (.json)"
     }
   }
 };
