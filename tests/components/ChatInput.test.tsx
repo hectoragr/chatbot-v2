@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ChatInput } from '@/components/chat/ChatInput';
+import '@/i18n/config';
 
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => ({ models: { OPENAI: [{ id: 'gpt-4o-mini', label: 'GPT-4o mini' }] }, allModels: [{ id: 'gpt-4o-mini', provider: 'OPENAI', label: 'GPT-4o Mini', description: '', costPer1kTokens: 0.15 }] }) })));
@@ -19,5 +20,14 @@ describe('ChatInput', () => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'hi there' } });
     fireEvent.click(screen.getByLabelText(/send/i));
     expect(onSend).toHaveBeenCalledWith('hi there');
+  });
+  it('shows the Auto option as selected when model is auto', () => {
+    render(<ChatInput provider="AUTO" model="auto" onModelChange={() => {}} onSend={() => {}} quota={baseQuota} />);
+    expect(screen.getByText('Auto')).toBeInTheDocument();
+  });
+
+  it('shows which model answered in auto mode', () => {
+    render(<ChatInput provider="AUTO" model="auto" lastAutoModel="deepseek-chat" onModelChange={() => {}} onSend={() => {}} quota={baseQuota} />);
+    expect(screen.getByText(/deepseek-chat/)).toBeInTheDocument();
   });
 });

@@ -30,8 +30,9 @@ export function ChatShell() {
   const [conversations, setConversations] = useState<Convo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
-  const [model, setModel] = useState('gpt-4o-mini');
-  const [provider, setProvider] = useState('OPENAI');
+  const [model, setModel] = useState('auto');
+  const [provider, setProvider] = useState('AUTO');
+  const [lastAutoModel, setLastAutoModel] = useState<string | null>(null);
   const [quota, setQuota] = useState<QuotaStatusDTO>(EMPTY_QUOTA);
   const [providerRemaining, setProviderRemaining] = useState<Record<string, number> | undefined>(undefined);
   const [typing, setTyping] = useState(false);
@@ -83,6 +84,7 @@ export function ChatShell() {
       setMessages((m) => [...m, errMsg]);
     } else if (status === 200 && body.valid) {
       setMessages((m) => [...m, body.message]);
+      setLastAutoModel(body.modelUsed ?? null);
       if (body.conversationId) {
         setActiveId(body.conversationId);
         setConversations((c) => c.filter((x) => !x.conversation_id.startsWith(TEMP_PREFIX)));
@@ -152,6 +154,7 @@ export function ChatShell() {
                 quota={quota}
                 pendingApproval={pendingApproval}
                 providerRemaining={providerRemaining}
+                lastAutoModel={lastAutoModel}
               />
             }>
               <MessageList messages={messages} typing={typing} />

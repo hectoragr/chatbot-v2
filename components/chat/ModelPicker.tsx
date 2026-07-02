@@ -24,20 +24,32 @@ export function ModelPicker({ modelId, onChange, providerRemaining }: Props) {
 
   const hasProviderData = providerRemaining && Object.keys(providerRemaining).length > 0;
 
-  const options = models.map((m) => {
-    const isDisabled = hasProviderData
-      && !providerRemaining['ANY']
-      && (providerRemaining[m.provider] === undefined || providerRemaining[m.provider] === 0);
+  const autoOption = {
+    label: t('autoModelLabel'),
+    value: 'AUTO:auto',
+    description: t('autoModelDescription'),
+    disabled: false,
+  };
 
-    return {
-      label: m.label,
-      value: `${m.provider}:${m.id}`,
-      description: isDisabled ? `${m.description} (${t('noTokensForProvider', { provider: m.provider })})` : m.description,
-      disabled: isDisabled,
-    };
-  });
+  const options = [
+    autoOption,
+    ...models.map((m) => {
+      const isDisabled = hasProviderData
+        && !providerRemaining['ANY']
+        && (providerRemaining[m.provider] === undefined || providerRemaining[m.provider] === 0);
 
-  const selected = options.find((o) => o.value === `${models.find((m) => m.id === modelId)?.provider}:${modelId}`) ?? null;
+      return {
+        label: m.label,
+        value: `${m.provider}:${m.id}`,
+        description: isDisabled ? `${m.description} (${t('noTokensForProvider', { provider: m.provider })})` : m.description,
+        disabled: isDisabled,
+      };
+    }),
+  ];
+
+  const selected = modelId === 'auto'
+    ? autoOption
+    : options.find((o) => o.value === `${models.find((m) => m.id === modelId)?.provider}:${modelId}`) ?? null;
 
   return (
     <Select
