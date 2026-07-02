@@ -76,6 +76,8 @@ All types in `lib/ddb.ts`. `user_id` **is the email** throughout this app.
 | `Usage` | `subject` + `period` | Quota ledger, TTL'd |
 | `RateLimits` | `key` | Burst counters, TTL'd |
 | `Blocks` | `subject` | `manual` (permanent) or `auto` (TTL) |
+| `Locales` | `lang` | LLM-generated UI translations: `name`, `rtl`, `translations`, `usageCount` |
+| `AdminDocs` | `doc_id` | Admin "about me" markdown docs: `title`, `topics`, `content` |
 
 GSIs on `Conversations`: `byUserCreatedAt` (all of a user's convos),
 `byTokenUserCreatedAt` (one token's convos). Created by `ddb:bootstrap` locally.

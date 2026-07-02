@@ -86,6 +86,20 @@ export class ChatbotV2Stack extends cdk.Stack {
     );
     const conversationsTable = tables[TABLE_NAMES.indexOf('Conversations')];
 
+    // New tables owned by this stack (batch 2) — created, not imported.
+    const localesTable = new dynamodb.Table(this, 'LocalesTable', {
+      tableName: 'Locales',
+      partitionKey: { name: 'lang', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+    const adminDocsTable = new dynamodb.Table(this, 'AdminDocsTable', {
+      tableName: 'AdminDocs',
+      partitionKey: { name: 'doc_id', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
     // ── 2. admin-fn Lambda (privileged role) ───────────────────────────────────
     // NodejsFunction uses esbuild to bundle admin-fn/handler.ts.
     // Role is auto-created by NodejsFunction; grantReadWriteData adds full CRUD
@@ -116,6 +130,11 @@ export class ChatbotV2Stack extends cdk.Stack {
 
     // Grant admin-fn full read/write on all 7 tables
     tables.forEach((table) => table.grantReadWriteData(adminFn));
+
+    // Grant admin-fn full read/write on the batch-2 tables too (manages
+    // Locales cache entries and AdminDocs content via the same op switch).
+    localesTable.grantReadWriteData(adminFn);
+    adminDocsTable.grantReadWriteData(adminFn);
 
     // ── 3. Server Lambda (user-scoped role) ────────────────────────────────────
     // Option A: manual lambda.Function from .open-next/server-functions/default
@@ -182,6 +201,11 @@ export class ChatbotV2Stack extends cdk.Stack {
         resources: [tokensTable.tableArn],
       }),
     );
+
+    // Batch-2 tables: server reads/writes the Locales cache (LLM-generated UI
+    // translations) but only reads AdminDocs (content is admin-managed).
+    localesTable.grantReadWriteData(serverFnRole);
+    adminDocsTable.grantReadData(serverFnRole);
 
     // Statement 3: InvokeFunction ONLY on admin-fn
     serverFnRole.addToPolicy(
