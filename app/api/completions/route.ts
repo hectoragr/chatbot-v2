@@ -12,6 +12,7 @@ import { recordHitAndMaybeBlock } from '@/lib/abuse';
 import { json, fail } from '@/lib/http';
 import type { Message } from '@/lib/ddb';
 import { selectTokenForProvider } from './selectTokenForProvider';
+import { pickModelForMessage } from '@/lib/autoModel';
 
 export async function POST(req: Request) {
   if (!verifyCSRFTokenValue(req.headers.get('x-csrf-token'))) {
@@ -20,6 +21,9 @@ export async function POST(req: Request) {
   try {
     const { message, conversationId, provider, model } = await req.json();
     if (!message || !provider) return json({ error: 'message and provider required' }, 400);
+    if (model !== undefined && typeof model !== 'string') return json({ error: 'invalid model' }, 400);
+    if (provider !== 'AUTO' && provider !== 'OPENAI' && provider !== 'DEEPSEEK') return json({ error: 'invalid provider' }, 400);
+    if (provider === 'AUTO' && model !== 'auto') return json({ error: 'invalid model for AUTO provider' }, 400);
 
     const subject = await resolveSubject(req);
 
@@ -39,19 +43,41 @@ export async function POST(req: Request) {
 
     const user = await getSessionUser();
     const email = user?.email ?? `anon:${subject.kind === 'anon' ? subject.anonId : 'x'}`;
-    const chosenModel = isValidModel(provider as Provider, model) ? model : defaultModel(provider as Provider);
+
+    // Auto mode: classify AFTER the quota/abuse gates so blocked users never
+    // trigger classifier spend. The client-sent provider is ignored.
+    let effectiveProvider = provider as Provider;
+    let effectiveModel = model;
+    if (model === 'auto') {
+      // Provider-aware: an approved user with token room can only be billed on
+      // the provider(s) their tokens cover. 'ANY' covers both. Users billed via
+      // the Usage ledger (anon/unapproved/token-exhausted) are provider-agnostic.
+      let allowedProviders: Provider[] | undefined;
+      if (subject.kind === 'user' && subject.approved && subject.token && (subject.token.limit - subject.token.used) > 0) {
+        const tokensWithRoom = (subject.tokens ?? []).filter((t) => t.isActive && (t.limit - t.used) > 0);
+        const providers = new Set(tokensWithRoom.map((t) => t.provider));
+        if (providers.has('ANY')) {
+          allowedProviders = ['OPENAI', 'DEEPSEEK'];
+        } else {
+          allowedProviders = [...providers] as Provider[];
+        }
+      }
+      effectiveModel = await pickModelForMessage(String(message), allowedProviders);
+      effectiveProvider = providerForModel(effectiveModel);
+    }
+    const chosenModel = isValidModel(effectiveProvider, effectiveModel) ? effectiveModel : defaultModel(effectiveProvider);
 
     // Anonymous users are not persisted; logged-in users get conversations.
     const persist = !!user;
     let convo = persist
-      ? await ensureConversation(conversationId, (subject as { token?: { token: string } }).token?.token ?? email, email, provider)
+      ? await ensureConversation(conversationId, (subject as { token?: { token: string } }).token?.token ?? email, email, effectiveProvider)
       : null;
 
     const now = new Date().toISOString();
     const userMsg: Message = { role: 'user', content: String(message), createdAt: now };
     const history: Message[] = [...(convo?.messages ?? []), userMsg];
 
-    const result = await runCompletion(provider, chosenModel, history);
+    const result = await runCompletion(effectiveProvider, chosenModel, history);
     const cost = result.estimatedTokens;
 
     const assistantMsg: Message = { role: 'assistant', content: result.content, createdAt: new Date().toISOString() };
@@ -63,7 +89,7 @@ export async function POST(req: Request) {
       // Multi-token quota fix: Select token based on provider match.
       // Priority: 1) Exact provider match, 2) 'ANY' provider, 3) Best token fallback
       const allTokens = subject.tokens ?? (subject.token ? [subject.token] : []);
-      const tokenToCharge = selectTokenForProvider(allTokens, provider, chosenModel) ?? subject.token;
+      const tokenToCharge = selectTokenForProvider(allTokens, effectiveProvider, chosenModel) ?? subject.token;
       await incrementTokenUsed(tokenToCharge.token, chargeAmount);
     } else {
       await consumeQuota(subject, chargeAmount);
@@ -90,6 +116,7 @@ export async function POST(req: Request) {
       displayName: convo?.displayName ?? null,
       remaining: post.remainingTokens,
       blocked: post.blocked,
+      modelUsed: chosenModel,
     });
   } catch (e) {
     return fail((e as Error)?.message);

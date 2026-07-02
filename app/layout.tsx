@@ -3,7 +3,12 @@ import './globals.css';
 import type { ReactNode } from 'react';
 import { Providers } from './providers';
 
-export const metadata = { title: 'chat.hectoragomez.com' };
+export const metadata = {
+  title: {
+    default: 'Chat · chat.hectoragomez.com',
+    template: '%s · chat.hectoragomez.com',
+  },
+};
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

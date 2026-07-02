@@ -12,7 +12,7 @@ import { getCsrf } from '@/lib/client/csrfClient';
 
 const PROVIDERS = [{ label: 'OpenAI', value: 'OPENAI' }, { label: 'DeepSeek', value: 'DEEPSEEK' }, { label: 'All', value: 'ANY' }];
 
-export function SignupRequestForm() {
+export function SignupRequestForm({ onDone }: { onDone?: () => void } = {}) {
   const { t } = useTranslation();
   const [company, setCompany] = useState('');
   const [tokenLimit, setTokenLimit] = useState('1000');
@@ -33,11 +33,19 @@ export function SignupRequestForm() {
     }
   };
 
+  if (status === 'ok') {
+    return (
+      <SpaceBetween size="l">
+        <Alert type="success">{t('tokenRequestSubmitted')}</Alert>
+        <Button variant="primary" onClick={() => onDone?.()}>{t('close')}</Button>
+      </SpaceBetween>
+    );
+  }
+
   return (
     <form onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <Form actions={<Button variant="primary" formAction="submit">{t('requestTokens')}</Button>}>
         <SpaceBetween size="l">
-          {status === 'ok' && <Alert type="success">{t('tokenRequestSubmitted')}</Alert>}
           {status === 'error' && <Alert type="error">{t('tokenRequestFailed')}</Alert>}
           <FormField label={t('company')}><Input value={company} onChange={({ detail }) => setCompany(detail.value)} /></FormField>
           <FormField label={t('tokensRequested')}><Input type="number" value={tokenLimit} onChange={({ detail }) => setTokenLimit(detail.value)} /></FormField>

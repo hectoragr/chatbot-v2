@@ -6,6 +6,7 @@ import Header from '@cloudscape-design/components/header';
 import Button from '@cloudscape-design/components/button';
 import Modal from '@cloudscape-design/components/modal';
 import SpaceBetween from '@cloudscape-design/components/space-between';
+import MarkdownMessage from '@/components/chat/MarkdownMessage';
 import type { ConversationDoc } from '@/lib/ddb';
 
 export function ConversationsTable({ items, onRefresh }: { items: ConversationDoc[]; onRefresh?: () => void }) {
@@ -40,23 +41,16 @@ export function ConversationsTable({ items, onRefresh }: { items: ConversationDo
         visible={!!viewing}
         onDismiss={() => setViewing(null)}
         header={viewing?.displayName ?? 'Conversation'}
-        size="large"
+        size="max"
       >
         <SpaceBetween size="s">
           {viewing?.messages.map((msg, i) => (
-            <Box
+            <MarkdownMessage
               key={i}
-              padding="s"
-              variant="div"
-            >
-              <Box fontWeight="bold" color={msg.role === 'user' ? 'text-status-info' : 'text-status-success'}>
-                {msg.role === 'user' ? '👤 User' : '🤖 Assistant'}
-                <Box variant="span" color="text-status-inactive" fontSize="body-s"> · {new Date(msg.createdAt).toLocaleString()}</Box>
-              </Box>
-              <Box variant="p" padding={{ top: 'xxs' }}>
-                {msg.content}
-              </Box>
-            </Box>
+              content={msg.content}
+              type={msg.role === 'user' ? 'prompt' : 'response'}
+              timestamp={new Date(msg.createdAt).toLocaleString()}
+            />
           ))}
           {!viewing?.messages.length && <Box color="text-status-inactive">No messages</Box>}
         </SpaceBetween>

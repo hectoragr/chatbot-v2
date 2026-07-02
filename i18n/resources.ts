@@ -81,7 +81,22 @@ export const resources = {
 
       // Provider tokens
       "noTokensForProvider": "No tokens remaining for {{provider}}",
-      "providerExhausted": "Your {{provider}} tokens are exhausted. Switch to a different model or request more tokens."
+      "providerExhausted": "Your {{provider}} tokens are exhausted. Switch to a different model or request more tokens.",
+
+      // Auto model
+      "autoModelLabel": "Auto",
+      "autoModelDescription": "Picks the best model for your question",
+      "answeredBy": "Answered by {{model}}",
+
+      // Copy Message
+      "copyMessage": "Copy message",
+      "copied": "Copied",
+      "copyFailed": "Copy failed",
+
+      // Export
+      "export": "Export",
+      "exportMarkdown": "Markdown (.md)",
+      "exportJson": "JSON (.json)"
     }
   },
   es: {
@@ -165,7 +180,22 @@ export const resources = {
 
       // Provider tokens
       "noTokensForProvider": "Sin tokens restantes para {{provider}}",
-      "providerExhausted": "Tus tokens de {{provider}} se han agotado. Cambia a un modelo diferente o solicita más tokens."
+      "providerExhausted": "Tus tokens de {{provider}} se han agotado. Cambia a un modelo diferente o solicita más tokens.",
+
+      // Auto model
+      "autoModelLabel": "Auto",
+      "autoModelDescription": "Elige el mejor modelo para tu pregunta",
+      "answeredBy": "Respondido por {{model}}",
+
+      // Copy Message
+      "copyMessage": "Copiar mensaje",
+      "copied": "Copiado",
+      "copyFailed": "Error al copiar",
+
+      // Export
+      "export": "Exportar",
+      "exportMarkdown": "Markdown (.md)",
+      "exportJson": "JSON (.json)"
     }
   },
   fr: {
@@ -250,7 +280,22 @@ export const resources = {
 
       // Provider tokens
       "noTokensForProvider": "Plus de tokens disponibles pour {{provider}}",
-      "providerExhausted": "Vos tokens {{provider}} sont épuisés. Changez de modèle ou demandez plus de tokens."
+      "providerExhausted": "Vos tokens {{provider}} sont épuisés. Changez de modèle ou demandez plus de tokens.",
+
+      // Auto model
+      "autoModelLabel": "Auto",
+      "autoModelDescription": "Choisit le meilleur modèle pour votre question",
+      "answeredBy": "Répondu par {{model}}",
+
+      // Copy Message
+      "copyMessage": "Copier le message",
+      "copied": "Copié",
+      "copyFailed": "Échec de la copie",
+
+      // Export
+      "export": "Exporter",
+      "exportMarkdown": "Markdown (.md)",
+      "exportJson": "JSON (.json)"
     }
   },
   de: {
@@ -335,7 +380,22 @@ export const resources = {
 
       // Provider tokens
       "noTokensForProvider": "Keine verbleibenden Tokens für {{provider}}",
-      "providerExhausted": "Ihre {{provider}}-Tokens sind aufgebraucht. Wechseln Sie das Modell oder fordern Sie mehr Tokens an."
+      "providerExhausted": "Ihre {{provider}}-Tokens sind aufgebraucht. Wechseln Sie das Modell oder fordern Sie mehr Tokens an.",
+
+      // Auto model
+      "autoModelLabel": "Auto",
+      "autoModelDescription": "Wählt das beste Modell für deine Frage",
+      "answeredBy": "Beantwortet von {{model}}",
+
+      // Copy Message
+      "copyMessage": "Nachricht kopieren",
+      "copied": "Kopiert",
+      "copyFailed": "Kopieren fehlgeschlagen",
+
+      // Export
+      "export": "Exportieren",
+      "exportMarkdown": "Markdown (.md)",
+      "exportJson": "JSON (.json)"
     }
   }
 };

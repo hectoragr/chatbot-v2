@@ -6,6 +6,7 @@ import ContentLayout from '@cloudscape-design/components/content-layout';
 import Header from '@cloudscape-design/components/header';
 import Container from '@cloudscape-design/components/container';
 import Button from '@cloudscape-design/components/button';
+import ButtonDropdown from '@cloudscape-design/components/button-dropdown';
 import Modal from '@cloudscape-design/components/modal';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import { ConversationList } from './ConversationList';
@@ -14,7 +15,7 @@ import { ChatInput } from './ChatInput';
 import { SettingsPanel } from './SettingsPanel';
 import { SignupRequestForm } from '@/components/auth/SignupRequestForm';
 import { fetchMe, fetchConversations, sendCompletion, deleteConversation } from '@/lib/client/api';
-import { providerForModel } from '@/lib/models';
+import { conversationToMarkdown, conversationToJson, safeFilename, downloadFile } from '@/lib/client/exportConversation';
 import type { QuotaStatusDTO } from '@/lib/client/api';
 
 interface Msg { role: 'user' | 'assistant' | 'system'; content: string; createdAt: string; }
@@ -30,8 +31,9 @@ export function ChatShell() {
   const [conversations, setConversations] = useState<Convo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
-  const [model, setModel] = useState('gpt-4o-mini');
-  const [provider, setProvider] = useState('OPENAI');
+  const [model, setModel] = useState('auto');
+  const [provider, setProvider] = useState('AUTO');
+  const [lastAutoModel, setLastAutoModel] = useState<string | null>(null);
   const [quota, setQuota] = useState<QuotaStatusDTO>(EMPTY_QUOTA);
   const [providerRemaining, setProviderRemaining] = useState<Record<string, number> | undefined>(undefined);
   const [typing, setTyping] = useState(false);
@@ -61,6 +63,7 @@ export function ChatShell() {
     ]);
     setActiveId(tempId);
     setMessages([]);
+    setLastAutoModel(null);
   };
 
   const selectConvo = (id: string) => {
@@ -68,6 +71,7 @@ export function ChatShell() {
     const c = conversations.find((x) => x.conversation_id === id);
     setActiveId(id);
     setMessages(c?.messages ?? []);
+    setLastAutoModel(null);
   };
 
   const onSend = async (text: string) => {
@@ -83,6 +87,7 @@ export function ChatShell() {
       setMessages((m) => [...m, errMsg]);
     } else if (status === 200 && body.valid) {
       setMessages((m) => [...m, body.message]);
+      setLastAutoModel(body.modelUsed ?? null);
       if (body.conversationId) {
         setActiveId(body.conversationId);
         setConversations((c) => c.filter((x) => !x.conversation_id.startsWith(TEMP_PREFIX)));
@@ -110,14 +115,29 @@ export function ChatShell() {
   const handleModelChange = (newProvider: string, newModel: string) => {
     setProvider(newProvider);
     setModel(newModel);
+    setLastAutoModel(null);
+  };
+
+  const exportActive = (format: string) => {
+    const name = conversations.find((c) => c.conversation_id === activeId)?.displayName ?? 'conversation';
+    const convo = { displayName: name, messages };
+    if (format === 'md') downloadFile(`${safeFilename(name)}.md`, conversationToMarkdown(convo), 'text/markdown');
+    else downloadFile(`${safeFilename(name)}.json`, conversationToJson(convo), 'application/json');
   };
 
   const headerActions = (
     <SpaceBetween direction="horizontal" size="xs">
-      <Button onClick={() => setToolsOpen((o) => !o)} iconName="settings">{t('settings')}</Button>
+      <ButtonDropdown
+        items={[{ id: 'md', text: t('exportMarkdown') }, { id: 'json', text: t('exportJson') }]}
+        disabled={messages.length === 0}
+        onItemClick={({ detail }) => exportActive(detail.id)}
+      >
+        {t('export')}
+      </ButtonDropdown>
+      <Button onClick={() => setToolsOpen((o) => !o)} iconName="settings" variant="icon" ariaLabel={t('settings')} />
       {authenticated
-        ? <Button onClick={() => setRequestOpen(true)}>{t('requestTokens')}</Button>
-        : <Button onClick={() => { window.location.href = '/auth/login?returnTo=/'; }}>{t('logIn')}</Button>
+        ? <Button onClick={() => setRequestOpen(true)} iconName="key" variant="icon" ariaLabel={t('requestTokens')} />
+        : <Button onClick={() => { window.location.href = '/auth/login?returnTo=/'; }} iconName="user-profile" variant="icon" ariaLabel={t('logIn')} />
       }
     </SpaceBetween>
   );
@@ -125,7 +145,7 @@ export function ChatShell() {
   return (
     <>
       <Modal visible={requestOpen} onDismiss={() => setRequestOpen(false)} header={t('requestTokens')}>
-        <SignupRequestForm />
+        <SignupRequestForm key={String(requestOpen)} onDone={() => setRequestOpen(false)} />
       </Modal>
       <AppLayout
         navigationHide={!authenticated}
@@ -152,6 +172,7 @@ export function ChatShell() {
                 quota={quota}
                 pendingApproval={pendingApproval}
                 providerRemaining={providerRemaining}
+                lastAutoModel={lastAutoModel}
               />
             }>
               <MessageList messages={messages} typing={typing} />
