@@ -10,15 +10,17 @@
 }
 
 .markdown-message.prompt {
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-    color: white;
+    background: #263349;
+    color: #e6e9ef;
     margin-left: auto;
+    border: 1px solid #364560;
 }
 
 .markdown-message.response {
-    background: linear-gradient(135deg, #0056b3 0%, #007bff 100%);
-    color: white;
+    background: #1e2633;
+    color: #e6e9ef;
     margin-right: auto;
+    border: 1px solid #2c3850;
 }
 
 /* Markdown Content Styling */
@@ -75,7 +77,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #f6f8fa;
+    background: #161b22;
+    color: #e6e9ef;
     padding: 8px 12px;
     font-size: 12px;
 }

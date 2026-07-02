@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import { useTranslation } from 'react-i18next';
 import CopyToClipboard from '@cloudscape-design/components/copy-to-clipboard';
-import 'highlight.js/styles/github.css';
+import 'highlight.js/styles/github-dark.css';
 import './MarkdownMessage.css';
 
 interface Props {

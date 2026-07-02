@@ -40,14 +40,14 @@ function applyTheme(theme: string) {
 
 export function SettingsPanel({ authenticated }: { authenticated?: boolean }) {
   const { t, i18n } = useTranslation();
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState('dark');
   const [deleteModal, setDeleteModal] = useState(false);
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'pending' | 'done' | 'error' | 'submitted'>('idle');
   const lang = LANGS.find((l) => l.value === i18n.language) ?? LANGS[0];
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const saved = localStorage.getItem('appearance') || 'light';
+    const saved = localStorage.getItem('appearance') || 'dark';
     setTheme(saved);
     applyTheme(saved);
   }, []);

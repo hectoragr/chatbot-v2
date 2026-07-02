@@ -326,3 +326,12 @@ body { min-height: 100%; }
     margin: 0 auto;
     padding: 24px 16px 48px;
 }
+
+/* Chat pane: IDE-style fixed-height scrollable message area */
+.chat-messages {
+    min-height: 45vh;
+    max-height: calc(100vh - 340px);
+    overflow-y: auto;
+    padding: 4px 2px;
+    scroll-behavior: smooth;
+}

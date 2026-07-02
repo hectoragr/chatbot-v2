@@ -132,10 +132,10 @@ export function ChatShell() {
       >
         {t('export')}
       </ButtonDropdown>
-      <Button onClick={() => setToolsOpen((o) => !o)} iconName="settings">{t('settings')}</Button>
+      <Button onClick={() => setToolsOpen((o) => !o)} iconName="settings" variant="icon" ariaLabel={t('settings')} />
       {authenticated
-        ? <Button onClick={() => setRequestOpen(true)}>{t('requestTokens')}</Button>
-        : <Button onClick={() => { window.location.href = '/auth/login?returnTo=/'; }}>{t('logIn')}</Button>
+        ? <Button onClick={() => setRequestOpen(true)} iconName="key" variant="icon" ariaLabel={t('requestTokens')} />
+        : <Button onClick={() => { window.location.href = '/auth/login?returnTo=/'; }} iconName="user-profile" variant="icon" ariaLabel={t('logIn')} />
       }
     </SpaceBetween>
   );
