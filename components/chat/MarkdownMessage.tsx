@@ -3,6 +3,8 @@ import React from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import { useTranslation } from 'react-i18next';
+import CopyToClipboard from '@cloudscape-design/components/copy-to-clipboard';
 import 'highlight.js/styles/github.css';
 import './MarkdownMessage.css';
 
@@ -81,6 +83,7 @@ const mdComponents: Components = {
 };
 
 export default function MarkdownMessage({ content, type, timestamp }: Props) {
+  const { t } = useTranslation();
   return (
     <div className={`markdown-message ${type}`}>
       <div className="markdown-content">
@@ -92,7 +95,16 @@ export default function MarkdownMessage({ content, type, timestamp }: Props) {
           {content}
         </ReactMarkdown>
       </div>
-      <span className="message-time">{timestamp}</span>
+      <div className="message-footer">
+        <span className="message-time">{timestamp}</span>
+        <CopyToClipboard
+          variant="icon"
+          textToCopy={content}
+          copyButtonAriaLabel={t('copyMessage')}
+          copySuccessText={t('copied')}
+          copyErrorText={t('copyFailed')}
+        />
+      </div>
     </div>
   );
 }

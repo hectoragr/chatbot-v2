@@ -200,13 +200,19 @@
     border-bottom-color: #b3d7ff;
 }
 
+/* Message Footer */
+.message-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 4px;
+}
+
 /* Message Time */
 .message-time {
-    display: block;
     font-size: 11px;
     opacity: 0.7;
-    margin-top: 8px;
-    text-align: right;
 }
 
 /* Animations */

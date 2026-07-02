@@ -86,7 +86,12 @@ export const resources = {
       // Auto model
       "autoModelLabel": "Auto",
       "autoModelDescription": "Picks the best model for your question",
-      "answeredBy": "Answered by {{model}}"
+      "answeredBy": "Answered by {{model}}",
+
+      // Copy Message
+      "copyMessage": "Copy message",
+      "copied": "Copied",
+      "copyFailed": "Copy failed"
     }
   },
   es: {
@@ -175,7 +180,12 @@ export const resources = {
       // Auto model
       "autoModelLabel": "Auto",
       "autoModelDescription": "Elige el mejor modelo para tu pregunta",
-      "answeredBy": "Respondido por {{model}}"
+      "answeredBy": "Respondido por {{model}}",
+
+      // Copy Message
+      "copyMessage": "Copiar mensaje",
+      "copied": "Copiado",
+      "copyFailed": "Error al copiar"
     }
   },
   fr: {
@@ -265,7 +275,12 @@ export const resources = {
       // Auto model
       "autoModelLabel": "Auto",
       "autoModelDescription": "Choisit le meilleur modèle pour votre question",
-      "answeredBy": "Répondu par {{model}}"
+      "answeredBy": "Répondu par {{model}}",
+
+      // Copy Message
+      "copyMessage": "Copier le message",
+      "copied": "Copié",
+      "copyFailed": "Échec de la copie"
     }
   },
   de: {
@@ -355,7 +370,12 @@ export const resources = {
       // Auto model
       "autoModelLabel": "Auto",
       "autoModelDescription": "Wählt das beste Modell für deine Frage",
-      "answeredBy": "Beantwortet von {{model}}"
+      "answeredBy": "Beantwortet von {{model}}",
+
+      // Copy Message
+      "copyMessage": "Nachricht kopieren",
+      "copied": "Kopiert",
+      "copyFailed": "Kopieren fehlgeschlagen"
     }
   }
 };
