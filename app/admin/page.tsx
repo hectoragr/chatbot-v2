@@ -38,14 +38,16 @@ export default function AdminPage() {
   if (error) return <Alert type="error" header="Could not load admin data">{error}</Alert>;
   if (!tables) return <Spinner />;
   return (
-    <ContentLayout header={<Header variant="h1">Admin</Header>}>
-      <SpaceBetween size="l">
-        <TokenRequestsTable items={tables.unprocessedTokens ?? []} onRefresh={load} />
-        <UsersTable users={tables.users ?? []} onRefresh={load} />
-        <TokensTable items={tables.tokens ?? []} onRefresh={load} />
-        <BlocksTable items={tables.blocks ?? []} onRefresh={load} />
-        <ConversationsTable items={tables.conversations ?? []} />
-      </SpaceBetween>
-    </ContentLayout>
+    <div className="admin-content">
+      <ContentLayout header={<Header variant="h1">Admin</Header>}>
+        <SpaceBetween size="xl">
+          <TokenRequestsTable items={tables.unprocessedTokens ?? []} onRefresh={load} />
+          <UsersTable users={tables.users ?? []} onRefresh={load} />
+          <TokensTable items={tables.tokens ?? []} onRefresh={load} />
+          <BlocksTable items={tables.blocks ?? []} onRefresh={load} />
+          <ConversationsTable items={tables.conversations ?? []} />
+        </SpaceBetween>
+      </ContentLayout>
+    </div>
   );
 }
