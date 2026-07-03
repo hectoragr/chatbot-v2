@@ -80,6 +80,10 @@ export async function POST(req: Request) {
       docIds = (await classifyMessage(String(message), { docTopics })).docIds;
     }
     if (images.length > 0) {
+      // Vision forces OpenAI. For legacy provider-scoped tokens this can
+      // cross-charge (e.g. a DEEPSEEK-only token pays for an OpenAI vision
+      // call via the selectTokenForProvider best-token fallback) — accepted
+      // in the batch-2 spec: provider distinctions are being deprecated.
       effectiveProvider = 'OPENAI';
       if (!isVisionModel(effectiveModel)) effectiveModel = VISION_FALLBACK_MODEL;
     }
