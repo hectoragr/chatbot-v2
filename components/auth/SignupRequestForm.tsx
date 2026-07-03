@@ -4,19 +4,15 @@ import { useTranslation } from 'react-i18next';
 import Form from '@cloudscape-design/components/form';
 import FormField from '@cloudscape-design/components/form-field';
 import Input from '@cloudscape-design/components/input';
-import Select from '@cloudscape-design/components/select';
 import Button from '@cloudscape-design/components/button';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import Alert from '@cloudscape-design/components/alert';
 import { getCsrf } from '@/lib/client/csrfClient';
 
-const PROVIDERS = [{ label: 'OpenAI', value: 'OPENAI' }, { label: 'DeepSeek', value: 'DEEPSEEK' }, { label: 'All', value: 'ANY' }];
-
 export function SignupRequestForm({ onDone }: { onDone?: () => void } = {}) {
   const { t } = useTranslation();
   const [company, setCompany] = useState('');
   const [tokenLimit, setTokenLimit] = useState('1000');
-  const [provider, setProvider] = useState(PROVIDERS[0]);
   const [status, setStatus] = useState<'idle' | 'ok' | 'error'>('idle');
 
   const submit = async () => {
@@ -25,7 +21,7 @@ export function SignupRequestForm({ onDone }: { onDone?: () => void } = {}) {
       const r = await fetch('/api/requestToken', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-        body: JSON.stringify({ company, tokenLimit: Number(tokenLimit), provider: provider.value }),
+        body: JSON.stringify({ company, tokenLimit: Number(tokenLimit), provider: 'ANY' }),
       });
       setStatus(r.ok ? 'ok' : 'error');
     } catch {
@@ -49,7 +45,6 @@ export function SignupRequestForm({ onDone }: { onDone?: () => void } = {}) {
           {status === 'error' && <Alert type="error">{t('tokenRequestFailed')}</Alert>}
           <FormField label={t('company')}><Input value={company} onChange={({ detail }) => setCompany(detail.value)} /></FormField>
           <FormField label={t('tokensRequested')}><Input type="number" value={tokenLimit} onChange={({ detail }) => setTokenLimit(detail.value)} /></FormField>
-          <FormField label={t('provider')}><Select selectedOption={provider} options={PROVIDERS} onChange={({ detail }) => setProvider(detail.selectedOption as typeof provider)} /></FormField>
         </SpaceBetween>
       </Form>
     </form>

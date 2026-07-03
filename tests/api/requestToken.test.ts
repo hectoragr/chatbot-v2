@@ -28,4 +28,16 @@ describe('POST /api/requestToken', () => {
     const body = await res.json();
     expect(body.error).toBe('login_required');
   });
+
+  it('defaults provider to ANY when omitted', async () => {
+    const { token } = generateCSRFToken('http://x');
+    const res = await POST(new Request('http://x/api/requestToken', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-csrf-token': token },
+      body: JSON.stringify({ tokenLimit: 1000 }),
+    }));
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('login_required');
+  });
 });
