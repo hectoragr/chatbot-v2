@@ -1,4 +1,4 @@
-import { DynamoDBClient, CreateTableCommand, DeleteTableCommand, ListTablesCommand, UpdateTableCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, CreateTableCommand, DeleteTableCommand, ListTablesCommand, UpdateTableCommand, UpdateTimeToLiveCommand } from "@aws-sdk/client-dynamodb";
 
 const REGION = process.env.AWS_REGION || "us-west-2";
 const ENDPOINT = process.env.DDB_ENDPOINT; // used when LOCAL_DDB=true
@@ -225,6 +225,21 @@ async function createTables() {
     KeySchema: [{ AttributeName: "doc_id", KeyType: "HASH" }],
     BillingMode: "PAY_PER_REQUEST"
   });
+
+  // Conversations TTL (anon conversations expire after 30 days; attribute `ttl`).
+  try {
+    await client.send(new UpdateTimeToLiveCommand({
+      TableName: Tables.Conversations,
+      TimeToLiveSpecification: { Enabled: true, AttributeName: "ttl" },
+    }));
+    console.log("⏲  TTL enabled on Conversations (ttl)");
+  } catch (e) {
+    if (String(e?.message || e).includes("TimeToLive is already enabled")) {
+      console.log("✔ TTL already enabled on Conversations");
+    } else {
+      console.log(`⚠ TTL enable skipped: ${e?.message ?? e}`);
+    }
+  }
 }
 
 async function main() {
