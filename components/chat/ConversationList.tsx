@@ -23,12 +23,9 @@ export function ConversationList({ conversations, activeId, onSelect, onNew, onD
         </Button>
       </Box>
       {conversations.map((c) => (
-        <Box
-          key={c.conversation_id}
-          padding={{ horizontal: 'm', vertical: 'xxs' }}
-        >
-          <SpaceBetween size="xs" direction="horizontal" alignItems="center">
-            <div style={{ flex: 1, overflow: 'hidden' }}>
+        <Box key={c.conversation_id} padding={{ horizontal: 'm', vertical: 'xxs' }}>
+          <div data-testid={`convo-row-${c.conversation_id}`} style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
               <Button
                 variant={c.conversation_id === activeId ? 'primary' : 'inline-link'}
                 onClick={() => onSelect(c.conversation_id)}
@@ -40,14 +37,16 @@ export function ConversationList({ conversations, activeId, onSelect, onNew, onD
               </Button>
             </div>
             {onDelete && (
-              <Button
-                variant="inline-icon"
-                iconName="close"
-                ariaLabel={t('deleteConversation')}
-                onClick={(e) => { e.stopPropagation(); onDelete(c.conversation_id); }}
-              />
+              <div style={{ flexShrink: 0 }}>
+                <Button
+                  variant="inline-icon"
+                  iconName="close"
+                  ariaLabel={t('deleteConversation')}
+                  onClick={(e) => { e.stopPropagation(); onDelete(c.conversation_id); }}
+                />
+              </div>
             )}
-          </SpaceBetween>
+          </div>
         </Box>
       ))}
     </SpaceBetween>

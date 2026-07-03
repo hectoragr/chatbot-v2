@@ -147,39 +147,41 @@ export function SettingsPanel({ authenticated }: { authenticated?: boolean }) {
 
   return (
     <>
-      <SpaceBetween size="l">
-        <FormField label={t('language')}>
-          <Select selectedOption={selectedLang} options={langOptions}
-            onChange={({ detail }) => switchLanguage(detail.selectedOption.value!)} />
-        </FormField>
-        {addingLang && (
-          <FormField label={t('addLanguagePrompt')} errorText={langStatus === 'error' ? t('languageAddFailed') : undefined}>
-            <SpaceBetween size="xs" direction="horizontal">
-              <Input value={langInput} onChange={({ detail }) => setLangInput(detail.value)} />
-              <Button variant="primary" loading={langStatus === 'pending'} onClick={submitNewLanguage}>{t('send')}</Button>
-              <Button variant="link" onClick={() => { setAddingLang(false); setLangStatus('idle'); }}>{t('cancel')}</Button>
-            </SpaceBetween>
+      <Box padding={{ horizontal: 's', vertical: 's' }}>
+        <SpaceBetween size="l">
+          <FormField label={t('language')}>
+            <Select selectedOption={selectedLang} options={langOptions}
+              onChange={({ detail }) => switchLanguage(detail.selectedOption.value!)} />
           </FormField>
-        )}
-        <FormField label={t('appearance')}>
-          <Select
-            selectedOption={THEMES.find((th) => th.value === theme) ?? THEMES[0]}
-            options={THEMES}
-            onChange={({ detail }) => {
-              const v = detail.selectedOption.value!;
-              setTheme(v);
-              applyTheme(v);
-            }}
-          />
-        </FormField>
-        {authenticated && (
-          <FormField label={t('account')}>
-            <Button variant="normal" onClick={() => setDeleteModal(true)}>
-              {t('requestAccountDeletion')}
-            </Button>
+          {addingLang && (
+            <FormField label={t('addLanguagePrompt')} errorText={langStatus === 'error' ? t('languageAddFailed') : undefined}>
+              <SpaceBetween size="xs" direction="horizontal">
+                <Input value={langInput} onChange={({ detail }) => setLangInput(detail.value)} />
+                <Button variant="primary" loading={langStatus === 'pending'} onClick={submitNewLanguage}>{t('send')}</Button>
+                <Button variant="link" onClick={() => { setAddingLang(false); setLangStatus('idle'); }}>{t('cancel')}</Button>
+              </SpaceBetween>
+            </FormField>
+          )}
+          <FormField label={t('appearance')}>
+            <Select
+              selectedOption={THEMES.find((th) => th.value === theme) ?? THEMES[0]}
+              options={THEMES}
+              onChange={({ detail }) => {
+                const v = detail.selectedOption.value!;
+                setTheme(v);
+                applyTheme(v);
+              }}
+            />
           </FormField>
-        )}
-      </SpaceBetween>
+          {authenticated && (
+            <FormField label={t('account')}>
+              <Button variant="normal" onClick={() => setDeleteModal(true)}>
+                {t('requestAccountDeletion')}
+              </Button>
+            </FormField>
+          )}
+        </SpaceBetween>
+      </Box>
 
       <Modal
         visible={deleteModal}

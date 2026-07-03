@@ -6,12 +6,20 @@ import Header from '@cloudscape-design/components/header';
 import Button from '@cloudscape-design/components/button';
 import Modal from '@cloudscape-design/components/modal';
 import SpaceBetween from '@cloudscape-design/components/space-between';
+import ButtonDropdown from '@cloudscape-design/components/button-dropdown';
 import MarkdownMessage from '@/components/chat/MarkdownMessage';
 import type { ConversationDoc } from '@/lib/ddb';
+import { conversationToMarkdown, conversationToJson, safeFilename, downloadFile } from '@/lib/client/exportConversation';
 
 export function ConversationsTable({ items, onRefresh }: { items: ConversationDoc[]; onRefresh?: () => void }) {
   void onRefresh;
   const [viewing, setViewing] = useState<ConversationDoc | null>(null);
+
+  const exportConvo = (c: ConversationDoc, format: string) => {
+    const convo = { displayName: c.displayName, messages: c.messages };
+    if (format === 'md') downloadFile(`${safeFilename(c.displayName)}.md`, conversationToMarkdown(convo), 'text/markdown');
+    else downloadFile(`${safeFilename(c.displayName)}.json`, conversationToJson(convo), 'application/json');
+  };
 
   return (
     <>
@@ -32,6 +40,18 @@ export function ConversationsTable({ items, onRefresh }: { items: ConversationDo
           { id: 'provider', header: 'Provider', cell: (c) => c.provider },
           { id: 'messages', header: 'Messages', cell: (c) => String(c.messages.length) },
           { id: 'updated', header: 'Updated', cell: (c) => new Date(c.updatedAt).toLocaleString() },
+          {
+            id: 'actions',
+            header: 'Actions',
+            cell: (c) => (
+              <ButtonDropdown
+                variant="inline-icon"
+                ariaLabel={`Export ${c.displayName}`}
+                items={[{ id: 'md', text: 'Export Markdown (.md)' }, { id: 'json', text: 'Export JSON (.json)' }]}
+                onItemClick={({ detail }) => exportConvo(c, detail.id)}
+              />
+            ),
+          },
         ]}
         empty={<Box textAlign="center">No conversations</Box>}
         variant="container"
@@ -42,6 +62,14 @@ export function ConversationsTable({ items, onRefresh }: { items: ConversationDo
         onDismiss={() => setViewing(null)}
         header={viewing?.displayName ?? 'Conversation'}
         size="max"
+        footer={viewing && (
+          <ButtonDropdown
+            items={[{ id: 'md', text: 'Export Markdown (.md)' }, { id: 'json', text: 'Export JSON (.json)' }]}
+            onItemClick={({ detail }) => exportConvo(viewing, detail.id)}
+          >
+            Export
+          </ButtonDropdown>
+        )}
       >
         <SpaceBetween size="s">
           {viewing?.messages.map((msg, i) => (

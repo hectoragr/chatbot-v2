@@ -27,4 +27,9 @@ describe('ConversationsTable modal', () => {
     // message-level copy buttons from MarkdownMessage
     expect(screen.getAllByRole('button', { name: 'Copy message' })).toHaveLength(2);
   });
+
+  it('offers an export action per row', () => {
+    render(<ConversationsTable items={[convo]} />);
+    expect(screen.getAllByRole('button', { name: /export/i }).length).toBeGreaterThanOrEqual(1);
+  });
 });
