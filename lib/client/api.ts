@@ -44,3 +44,18 @@ export async function deleteConversation(id: string) {
   });
   return { status: r.status, body: await r.json() };
 }
+
+export async function fetchCaptcha() {
+  const r = await fetch('/api/captcha');
+  return (await r.json()) as { id: string; question: string };
+}
+
+export async function postContact(input: { message: string; captchaId?: string; captchaAnswer?: string }) {
+  const csrf = await getCsrf();
+  const r = await fetch('/api/contact', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+    body: JSON.stringify(input),
+  });
+  return { status: r.status, body: await r.json() };
+}

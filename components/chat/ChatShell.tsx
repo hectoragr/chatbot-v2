@@ -9,12 +9,13 @@ import Button from '@cloudscape-design/components/button';
 import ButtonDropdown from '@cloudscape-design/components/button-dropdown';
 import Modal from '@cloudscape-design/components/modal';
 import SpaceBetween from '@cloudscape-design/components/space-between';
+import Alert from '@cloudscape-design/components/alert';
 import { ConversationList } from './ConversationList';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { SettingsPanel } from './SettingsPanel';
 import { SignupRequestForm } from '@/components/auth/SignupRequestForm';
-import { fetchMe, fetchConversations, sendCompletion, deleteConversation } from '@/lib/client/api';
+import { fetchMe, fetchConversations, sendCompletion, deleteConversation, postContact, fetchCaptcha } from '@/lib/client/api';
 import { conversationToMarkdown, conversationToJson, safeFilename, downloadFile } from '@/lib/client/exportConversation';
 import type { QuotaStatusDTO } from '@/lib/client/api';
 
@@ -39,6 +40,9 @@ export function ChatShell() {
   const [typing, setTyping] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
+  const [contactMode, setContactMode] = useState(false);
+  const [captcha, setCaptcha] = useState<{ id: string; question: string } | null>(null);
+  const [contactStatus, setContactStatus] = useState<'idle' | 'sent' | 'error'>('idle');
 
   useEffect(() => {
     (async () => {
@@ -74,7 +78,19 @@ export function ChatShell() {
     setLastAutoModel(null);
   };
 
-  const onSend = async (text: string) => {
+  const startContact = async () => {
+    setContactMode(true);
+    setContactStatus('idle');
+    if (!authenticated) setCaptcha(await fetchCaptcha());
+  };
+
+  const onSend = async (text: string, extra?: { captchaAnswer?: string }) => {
+    if (contactMode) {
+      const { status, body } = await postContact({ message: text, captchaId: captcha?.id, captchaAnswer: extra?.captchaAnswer });
+      if (status === 200) { setContactMode(false); setContactStatus('sent'); }
+      else { setContactStatus('error'); if (body?.captcha) setCaptcha(body.captcha); }
+      return;
+    }
     const userMsg: Msg = { role: 'user', content: text, createdAt: new Date().toISOString() };
     setMessages((m) => [...m, userMsg]);
     setTyping(true);
@@ -134,6 +150,7 @@ export function ChatShell() {
       >
         {t('export')}
       </ButtonDropdown>
+      <Button onClick={startContact} iconName="envelope" variant="icon" ariaLabel={t('contactAdmin')} />
       <Button onClick={() => setToolsOpen((o) => !o)} iconName="settings" variant="icon" ariaLabel={t('settings')} />
       {authenticated
         ? <Button onClick={() => setRequestOpen(true)} iconName="key" variant="icon" ariaLabel={t('requestTokens')} />
@@ -163,20 +180,25 @@ export function ChatShell() {
         tools={<SettingsPanel authenticated={authenticated} />}
         content={
           <ContentLayout header={<Header variant="h1" actions={headerActions}>{t('chat')}</Header>}>
-            <Container footer={
-              <ChatInput
-                provider={provider}
-                model={model}
-                onModelChange={handleModelChange}
-                onSend={onSend}
-                quota={quota}
-                pendingApproval={pendingApproval}
-                providerRemaining={providerRemaining}
-                lastAutoModel={lastAutoModel}
-              />
-            }>
-              <MessageList messages={messages} typing={typing} />
-            </Container>
+            <SpaceBetween size="s">
+              {contactStatus === 'sent' && <Alert type="success" dismissible onDismiss={() => setContactStatus('idle')}>{t('contactSent')}</Alert>}
+              {contactStatus === 'error' && <Alert type="error" dismissible onDismiss={() => setContactStatus('idle')}>{t('contactFailed')}</Alert>}
+              <Container footer={
+                <ChatInput
+                  provider={provider}
+                  model={model}
+                  onModelChange={handleModelChange}
+                  onSend={onSend}
+                  quota={quota}
+                  pendingApproval={pendingApproval}
+                  providerRemaining={providerRemaining}
+                  lastAutoModel={lastAutoModel}
+                  contact={contactMode ? { active: true, anon: !authenticated, question: captcha?.question ?? null, onCancel: () => setContactMode(false) } : undefined}
+                />
+              }>
+                <MessageList messages={messages} typing={typing} />
+              </Container>
+            </SpaceBetween>
           </ContentLayout>
         }
       />

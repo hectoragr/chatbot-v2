@@ -96,7 +96,15 @@ export const resources = {
       // Export
       "export": "Export",
       "exportMarkdown": "Markdown (.md)",
-      "exportJson": "JSON (.json)"
+      "exportJson": "JSON (.json)",
+
+      // Contact mode
+      "contactAdmin": "Contact the site owner",
+      "contactModeHint": "This message will be emailed to the site owner — the AI will not answer it.",
+      "contactTemplate": "Hello, I'd like to get in touch about: ",
+      "contactSent": "Message sent. Thanks for reaching out!",
+      "contactFailed": "Could not send the message. Please try again.",
+      "captchaLabel": "Anti-spam check: what is {{question}}?"
     }
   },
   es: {
@@ -195,7 +203,15 @@ export const resources = {
       // Export
       "export": "Exportar",
       "exportMarkdown": "Markdown (.md)",
-      "exportJson": "JSON (.json)"
+      "exportJson": "JSON (.json)",
+
+      // Contact mode
+      "contactAdmin": "Contactar al dueño del sitio",
+      "contactModeHint": "Este mensaje se enviará por correo al dueño del sitio — la IA no lo responderá.",
+      "contactTemplate": "Hola, me gustaría ponerme en contacto sobre: ",
+      "contactSent": "Mensaje enviado. ¡Gracias por escribir!",
+      "contactFailed": "No se pudo enviar el mensaje. Inténtalo de nuevo.",
+      "captchaLabel": "Control anti-spam: ¿cuánto es {{question}}?"
     }
   },
   fr: {
@@ -295,7 +311,15 @@ export const resources = {
       // Export
       "export": "Exporter",
       "exportMarkdown": "Markdown (.md)",
-      "exportJson": "JSON (.json)"
+      "exportJson": "JSON (.json)",
+
+      // Contact mode
+      "contactAdmin": "Contacter le propriétaire du site",
+      "contactModeHint": "Ce message sera envoyé par e-mail au propriétaire du site — l'IA n'y répondra pas.",
+      "contactTemplate": "Bonjour, je souhaite vous contacter au sujet de : ",
+      "contactSent": "Message envoyé. Merci !",
+      "contactFailed": "Échec de l'envoi du message. Veuillez réessayer.",
+      "captchaLabel": "Vérification anti-spam : combien font {{question}} ?"
     }
   },
   de: {
@@ -395,7 +419,15 @@ export const resources = {
       // Export
       "export": "Exportieren",
       "exportMarkdown": "Markdown (.md)",
-      "exportJson": "JSON (.json)"
+      "exportJson": "JSON (.json)",
+
+      // Contact mode
+      "contactAdmin": "Seitenbetreiber kontaktieren",
+      "contactModeHint": "Diese Nachricht wird dem Seitenbetreiber per E-Mail gesendet — die KI beantwortet sie nicht.",
+      "contactTemplate": "Hallo, ich möchte Kontakt aufnehmen bezüglich: ",
+      "contactSent": "Nachricht gesendet. Danke!",
+      "contactFailed": "Nachricht konnte nicht gesendet werden. Bitte erneut versuchen.",
+      "captchaLabel": "Anti-Spam-Prüfung: Was ist {{question}}?"
     }
   }
 };

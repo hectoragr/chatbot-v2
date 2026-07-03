@@ -19,7 +19,7 @@ describe('ChatInput', () => {
     render(<ChatInput provider="OPENAI" model="gpt-4o-mini" onModelChange={() => {}} onSend={onSend} quota={baseQuota} />);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'hi there' } });
     fireEvent.click(screen.getByLabelText(/send/i));
-    expect(onSend).toHaveBeenCalledWith('hi there');
+    expect(onSend).toHaveBeenCalledWith('hi there', undefined);
   });
   it('shows the Auto option as selected when model is auto', () => {
     render(<ChatInput provider="AUTO" model="auto" onModelChange={() => {}} onSend={() => {}} quota={baseQuota} />);
@@ -29,5 +29,23 @@ describe('ChatInput', () => {
   it('shows which model answered in auto mode', () => {
     render(<ChatInput provider="AUTO" model="auto" lastAutoModel="deepseek-chat" onModelChange={() => {}} onSend={() => {}} quota={baseQuota} />);
     expect(screen.getByText(/deepseek-chat/)).toBeInTheDocument();
+  });
+
+  it('shows contact hint and captcha input in anonymous contact mode', () => {
+    render(<ChatInput provider="AUTO" model="auto" onModelChange={() => {}} onSend={() => {}} quota={baseQuota}
+      contact={{ active: true, anon: true, question: '3 + 4', onCancel: () => {} }} />);
+    expect(screen.getByText(/emailed to the site owner/i)).toBeInTheDocument();
+    expect(screen.getByText(/3 \+ 4/)).toBeInTheDocument();
+  });
+
+  it('passes the captcha answer through onSend in contact mode', () => {
+    const onSend = vi.fn();
+    render(<ChatInput provider="AUTO" model="auto" onModelChange={() => {}} onSend={onSend} quota={baseQuota}
+      contact={{ active: true, anon: true, question: '3 + 4', onCancel: () => {} }} />);
+    fireEvent.change(screen.getByRole('textbox', { name: '' }), { target: { value: 'hello owner' } });
+    const answerInput = screen.getByPlaceholderText('?');
+    fireEvent.change(answerInput, { target: { value: '7' } });
+    fireEvent.click(screen.getByLabelText(/send/i));
+    expect(onSend).toHaveBeenCalledWith('hello owner', { captchaAnswer: '7' });
   });
 });
