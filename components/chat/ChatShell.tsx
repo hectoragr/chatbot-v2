@@ -84,7 +84,7 @@ export function ChatShell() {
     if (!authenticated) setCaptcha(await fetchCaptcha());
   };
 
-  const onSend = async (text: string, extra?: { captchaAnswer?: string }) => {
+  const onSend = async (text: string, extra?: { captchaAnswer?: string; attachments?: { name: string; kind: string; content: string }[] }) => {
     if (contactMode) {
       const { status, body } = await postContact({ message: text, captchaId: captcha?.id, captchaAnswer: extra?.captchaAnswer });
       if (status === 200) { setContactMode(false); setContactStatus('sent'); }
@@ -95,7 +95,7 @@ export function ChatShell() {
     setMessages((m) => [...m, userMsg]);
     setTyping(true);
     const realConvoId = activeId?.startsWith(TEMP_PREFIX) ? null : activeId;
-    const { status, body } = await sendCompletion({ message: text, provider, model, conversationId: realConvoId });
+    const { status, body } = await sendCompletion({ message: text, provider, model, conversationId: realConvoId, attachments: extra?.attachments });
     setTyping(false);
     if (status === 402 && body.error === 'provider_tokens_exhausted') {
       const providerName = body.provider ?? provider;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ChatInput } from '@/components/chat/ChatInput';
 import '@/i18n/config';
 
@@ -14,12 +14,12 @@ describe('ChatInput', () => {
     render(<ChatInput provider="OPENAI" model="gpt-4o-mini" onModelChange={() => {}} onSend={() => {}} quota={{ ...baseQuota, blocked: true }} />);
     expect(screen.getByRole('textbox')).toBeDisabled();
   });
-  it('calls onSend with typed message', () => {
+  it('calls onSend with typed message', async () => {
     const onSend = vi.fn();
     render(<ChatInput provider="OPENAI" model="gpt-4o-mini" onModelChange={() => {}} onSend={onSend} quota={baseQuota} />);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'hi there' } });
     fireEvent.click(screen.getByLabelText(/send/i));
-    expect(onSend).toHaveBeenCalledWith('hi there', undefined);
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('hi there', {}));
   });
   it('shows the Auto option as selected when model is auto', () => {
     render(<ChatInput provider="AUTO" model="auto" onModelChange={() => {}} onSend={() => {}} quota={baseQuota} />);
@@ -38,7 +38,7 @@ describe('ChatInput', () => {
     expect(screen.getByText(/3 \+ 4/)).toBeInTheDocument();
   });
 
-  it('passes the captcha answer through onSend in contact mode', () => {
+  it('passes the captcha answer through onSend in contact mode', async () => {
     const onSend = vi.fn();
     render(<ChatInput provider="AUTO" model="auto" onModelChange={() => {}} onSend={onSend} quota={baseQuota}
       contact={{ active: true, anon: true, question: '3 + 4', onCancel: () => {} }} />);
@@ -46,6 +46,11 @@ describe('ChatInput', () => {
     const answerInput = screen.getByPlaceholderText('?');
     fireEvent.change(answerInput, { target: { value: '7' } });
     fireEvent.click(screen.getByLabelText(/send/i));
-    expect(onSend).toHaveBeenCalledWith('hello owner', { captchaAnswer: '7' });
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('hello owner', { captchaAnswer: '7' }));
+  });
+
+  it('renders the file upload control', () => {
+    render(<ChatInput provider="AUTO" model="auto" onModelChange={() => {}} onSend={() => {}} quota={baseQuota} />);
+    expect(screen.getAllByText(/attach files/i).length).toBeGreaterThan(0);
   });
 });

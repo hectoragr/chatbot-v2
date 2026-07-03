@@ -107,7 +107,12 @@ export const resources = {
       "contactTemplate": "Hello, I'd like to get in touch about: ",
       "contactSent": "Message sent. Thanks for reaching out!",
       "contactFailed": "Could not send the message. Please try again.",
-      "captchaLabel": "Anti-spam check: what is {{question}}?"
+      "captchaLabel": "Anti-spam check: what is {{question}}?",
+
+      // Attachments
+      "attachFiles": "Attach files",
+      "attachHint": "txt, json, or images — max 3 files, 2 MB each",
+      "attachInvalid": "Unsupported or oversized file."
     }
   },
   es: {
@@ -217,7 +222,12 @@ export const resources = {
       "contactTemplate": "Hola, me gustaría ponerme en contacto sobre: ",
       "contactSent": "Mensaje enviado. ¡Gracias por escribir!",
       "contactFailed": "No se pudo enviar el mensaje. Inténtalo de nuevo.",
-      "captchaLabel": "Control anti-spam: ¿cuánto es {{question}}?"
+      "captchaLabel": "Control anti-spam: ¿cuánto es {{question}}?",
+
+      // Attachments
+      "attachFiles": "Adjuntar archivos",
+      "attachHint": "txt, json o imágenes — máx. 3 archivos, 2 MB cada uno",
+      "attachInvalid": "Archivo no compatible o demasiado grande."
     }
   },
   fr: {
@@ -328,7 +338,12 @@ export const resources = {
       "contactTemplate": "Bonjour, je souhaite vous contacter au sujet de : ",
       "contactSent": "Message envoyé. Merci !",
       "contactFailed": "Échec de l'envoi du message. Veuillez réessayer.",
-      "captchaLabel": "Vérification anti-spam : combien font {{question}} ?"
+      "captchaLabel": "Vérification anti-spam : combien font {{question}} ?",
+
+      // Attachments
+      "attachFiles": "Joindre des fichiers",
+      "attachHint": "txt, json ou images — 3 fichiers max, 2 Mo chacun",
+      "attachInvalid": "Fichier non pris en charge ou trop volumineux."
     }
   },
   de: {
@@ -439,7 +454,12 @@ export const resources = {
       "contactTemplate": "Hallo, ich möchte Kontakt aufnehmen bezüglich: ",
       "contactSent": "Nachricht gesendet. Danke!",
       "contactFailed": "Nachricht konnte nicht gesendet werden. Bitte erneut versuchen.",
-      "captchaLabel": "Anti-Spam-Prüfung: Was ist {{question}}?"
+      "captchaLabel": "Anti-Spam-Prüfung: Was ist {{question}}?",
+
+      // Attachments
+      "attachFiles": "Dateien anhängen",
+      "attachHint": "txt, json oder Bilder — max. 3 Dateien, je 2 MB",
+      "attachInvalid": "Nicht unterstützte oder zu große Datei."
     }
   }
 };

@@ -26,6 +26,7 @@ export async function fetchConversations() {
 
 export async function sendCompletion(input: {
   message: string; provider: string; model: string; conversationId?: string | null;
+  attachments?: { name: string; kind: string; content: string }[];
 }) {
   const csrf = await getCsrf();
   const r = await fetch('/api/completions', {
