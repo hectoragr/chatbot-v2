@@ -2,6 +2,7 @@ import { listTokens, deleteToken, updateToken, transformTokenRequestToToken, den
 import { listUsers, updateUser, deleteUserById, createUserIfNotExists } from '../lib/users.js';
 import { listConversations, getConversationsByUser, deleteConversation } from '../lib/conversations.js';
 import { listBlocks, addBlock, removeBlock } from '../lib/blocks.js';
+import { putAdminDoc, deleteAdminDoc, listAdminDocs, invalidateDocTopicsCache } from '../lib/adminDocs.js';
 
 export type AdminOp =
   | { op: 'listTables'; payload: Record<string, never> }
@@ -15,15 +16,17 @@ export type AdminOp =
   | { op: 'addBlock'; payload: { subject: string; reason: string } }
   | { op: 'removeBlock'; payload: { subject: string } }
   | { op: 'listBlocks'; payload: Record<string, never> }
-  | { op: 'purgeUser'; payload: { email: string } };
+  | { op: 'purgeUser'; payload: { email: string } }
+  | { op: 'putAdminDoc'; payload: { doc_id?: string; title: string; topics: string; content: string } }
+  | { op: 'deleteAdminDoc'; payload: { doc_id: string } };
 
 export async function runAdminOp(cmd: AdminOp): Promise<unknown> {
   switch (cmd.op) {
     case 'listTables': {
-      const [tokens, users, conversations, unprocessedTokens, blocks] = await Promise.all([
-        listTokens(), listUsers(), listConversations(), listUnprocessedTokensRequest(), listBlocks(),
+      const [tokens, users, conversations, unprocessedTokens, blocks, adminDocs] = await Promise.all([
+        listTokens(), listUsers(), listConversations(), listUnprocessedTokensRequest(), listBlocks(), listAdminDocs(),
       ]);
-      return { tokens, users, conversations, unprocessedTokens, blocks };
+      return { tokens, users, conversations, unprocessedTokens, blocks, adminDocs };
     }
     case 'updateUser':
       // updateUser(user_id, name?, email?, company?, approved?) — user_id IS the email in this app
@@ -59,6 +62,15 @@ export async function runAdminOp(cmd: AdminOp): Promise<unknown> {
       return { removed: true };
     case 'listBlocks':
       return { blocks: await listBlocks() };
+    case 'putAdminDoc': {
+      const doc = await putAdminDoc(cmd.payload);
+      invalidateDocTopicsCache();
+      return doc;
+    }
+    case 'deleteAdminDoc':
+      await deleteAdminDoc(cmd.payload.doc_id);
+      invalidateDocTopicsCache();
+      return { deleted: true };
     default:
       throw new Error('UNKNOWN_ADMIN_OP');
   }
