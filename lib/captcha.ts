@@ -1,4 +1,5 @@
 import { createHmac, randomBytes } from 'crypto';
+import { safeCompare } from './csrf';
 
 const TTL_MS = 10 * 60 * 1000;
 const secret = () => process.env.CSRF_SECRET || 'dev_secret';
@@ -23,7 +24,7 @@ export function verifyCaptcha(id: string, answer: string): boolean {
     const { nonce, exp, sig } = JSON.parse(Buffer.from(String(id), 'base64url').toString());
     if (typeof exp !== 'number' || typeof nonce !== 'string' || typeof sig !== 'string') return false;
     if (Date.now() > exp) return false;
-    return sign(String(answer).trim(), nonce, exp) === sig;
+    return safeCompare(sign(String(answer).trim(), nonce, exp), sig);
   } catch {
     return false;
   }
