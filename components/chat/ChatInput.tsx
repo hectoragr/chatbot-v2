@@ -59,30 +59,36 @@ export function ChatInput({ model, onModelChange, onSend, quota, pendingApproval
   const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const disabled = quota.blocked;
   const submit = async () => {
-    if (disabled || value.trim() === '') return;
+    if (sending || disabled || value.trim() === '') return;
     setFileError(null);
-    const attachments: { name: string; kind: string; content: string }[] = [];
-    for (const f of files.slice(0, MAX_FILES)) {
-      const kind = kindOf(f);
-      if (!kind) { setFileError(t('attachInvalid')); return; }
-      const byteCap = kind === 'image' ? MAX_IMAGE_BYTES : MAX_BYTES;
-      if (f.size > byteCap) { setFileError(t('attachInvalid')); return; }
-      const content = kind === 'image' ? await readAsDataUrl(f) : await f.text();
-      if (kind === 'json') {
-        try { JSON.parse(content); } catch { setFileError(t('attachInvalid')); return; }
+    setSending(true);
+    try {
+      const attachments: { name: string; kind: string; content: string }[] = [];
+      for (const f of files.slice(0, MAX_FILES)) {
+        const kind = kindOf(f);
+        if (!kind) { setFileError(t('attachInvalid')); return; }
+        const byteCap = kind === 'image' ? MAX_IMAGE_BYTES : MAX_BYTES;
+        if (f.size > byteCap) { setFileError(t('attachInvalid')); return; }
+        const content = kind === 'image' ? await readAsDataUrl(f) : await f.text();
+        if (kind === 'json') {
+          try { JSON.parse(content); } catch { setFileError(t('attachInvalid')); return; }
+        }
+        attachments.push({ name: f.name, kind, content });
       }
-      attachments.push({ name: f.name, kind, content });
+      const ok = await onSend(value.trim(), {
+        ...(contact?.active && contact.anon ? { captchaAnswer } : {}),
+        ...(attachments.length ? { attachments } : {}),
+      });
+      if (ok === false) return;
+      setValue('');
+      setCaptchaAnswer('');
+      setFiles([]);
+    } finally {
+      setSending(false);
     }
-    const ok = await onSend(value.trim(), {
-      ...(contact?.active && contact.anon ? { captchaAnswer } : {}),
-      ...(attachments.length ? { attachments } : {}),
-    });
-    if (ok === false) return;
-    setValue('');
-    setCaptchaAnswer('');
-    setFiles([]);
   };
 
   useEffect(() => {
@@ -140,7 +146,7 @@ export function ChatInput({ model, onModelChange, onSend, quota, pendingApproval
           }}
         />
       )}
-      <Button variant="primary" disabled={disabled} ariaLabel={t('send')} onClick={submit}>{t('send')}</Button>
+      <Button variant="primary" disabled={disabled} loading={sending} ariaLabel={t('send')} onClick={submit}>{t('send')}</Button>
     </SpaceBetween>
   );
 }

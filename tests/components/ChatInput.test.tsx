@@ -63,4 +63,19 @@ describe('ChatInput', () => {
     await waitFor(() => expect(onSend).toHaveBeenCalled());
     expect((textarea as HTMLTextAreaElement).value).toBe('do not lose me');
   });
+
+  it('ignores a rapid second Send click while the first send is still in flight', async () => {
+    let resolveSend: (value: boolean) => void;
+    const onSend = vi.fn(() => new Promise<boolean>((resolve) => { resolveSend = resolve; }));
+    render(<ChatInput provider="OPENAI" model="gpt-4o-mini" onModelChange={() => {}} onSend={onSend} quota={baseQuota} />);
+    const textarea = screen.getByRole('textbox');
+    fireEvent.change(textarea, { target: { value: 'double click me' } });
+    const sendButton = screen.getByLabelText(/send/i);
+    fireEvent.click(sendButton);
+    fireEvent.click(sendButton);
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
+    resolveSend!(true);
+    await waitFor(() => expect((textarea as HTMLTextAreaElement).value).toBe(''));
+    expect(onSend).toHaveBeenCalledTimes(1);
+  });
 });
