@@ -23,11 +23,13 @@ export async function addBlock(subject: string, reason: string, source: 'manual'
     ...(ttlSeconds ? { ttl: Math.floor(Date.now() / 1000) + ttlSeconds } : {}),
   };
   await ddb().send(new PutCommand({ TableName: TABLES.Blocks, Item: doc }));
+  invalidatePatternBlockCache();
   return doc;
 }
 
 export async function removeBlock(subject: string): Promise<void> {
   await ddb().send(new DeleteCommand({ TableName: TABLES.Blocks, Key: { subject } }));
+  invalidatePatternBlockCache();
 }
 
 export async function listBlocks(limit = 200): Promise<BlockDoc[]> {
@@ -51,9 +53,21 @@ const PATTERN_CACHE_TTL_MS = 60_000;
 let patternCache: { at: number; items: BlockDoc[] } | null = null;
 export function invalidatePatternBlockCache(): void { patternCache = null; }
 
-/** `*` is the only wildcard; everything else is escaped. Case-insensitive. */
+const MAX_GLOB_LENGTH = 200;
+
+/**
+ * `*` is the only wildcard; everything else is escaped. Case-insensitive.
+ *
+ * Repeated wildcards (e.g. `***`) are collapsed to a single `*` BEFORE
+ * escaping, so the compiled regex never contains adjacent `.*` groups —
+ * adjacent `.*.*` groups against a non-matching string trigger catastrophic
+ * backtracking (ReDoS). Oversized globs (>200 chars) are rejected outright
+ * as defense in depth and compile to a regex that never matches.
+ */
 export function emailPatternToRegex(glob: string): RegExp {
-  const escaped = glob.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replaceAll('\\*', '.*');
+  if (glob.length > MAX_GLOB_LENGTH) return /(?!)/;
+  const collapsed = glob.replace(/\*+/g, '*');
+  const escaped = collapsed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replaceAll('\\*', '.*');
   return new RegExp(`^${escaped}$`, 'i');
 }
 
