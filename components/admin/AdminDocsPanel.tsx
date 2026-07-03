@@ -38,13 +38,19 @@ export function AdminDocsPanel({ docs, onRefresh }: { docs: AdminDocDoc[]; onRef
   };
 
   const remove = async (doc_id: string) => {
-    const csrf = await getCsrf();
-    await fetch('/api/admin/docs', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-      body: JSON.stringify({ doc_id }),
-    });
-    onRefresh();
+    setError(null);
+    try {
+      const csrf = await getCsrf();
+      const r = await fetch('/api/admin/docs', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+        body: JSON.stringify({ doc_id }),
+      });
+      if (!r.ok) throw new Error(`delete failed (${r.status})`);
+      onRefresh();
+    } catch (e) {
+      setError((e as Error).message);
+    }
   };
 
   return (
