@@ -32,6 +32,9 @@ export async function listAdminDocs(): Promise<AdminDocDoc[]> {
   return (r.Items as AdminDocDoc[]) ?? [];
 }
 
+// Same-process cache only: in prod, admin mutations run on the admin Lambda while
+// this cache lives in the server Lambda, so explicit invalidation never crosses
+// that boundary — the 60s TTL is the real staleness bound there.
 let topicsCache: { at: number; items: { doc_id: string; topics: string }[] } | null = null;
 export function invalidateDocTopicsCache(): void { topicsCache = null; }
 
