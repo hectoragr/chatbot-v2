@@ -82,3 +82,7 @@ export async function notifyRequesterDenied(opts: {
     `Hi ${opts.requesterName},\n\nWe were unable to approve your access request at this time. Please contact the administrator for more information.`,
   );
 }
+
+export async function notifyAdminContact(opts: { adminEmail: string; fromLabel: string; message: string }) {
+  await send(opts.adminEmail, 'Contact form message', `${opts.message}\n\n—\nFrom: ${opts.fromLabel}`);
+}
