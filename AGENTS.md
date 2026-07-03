@@ -76,6 +76,8 @@ All types in `lib/ddb.ts`. `user_id` **is the email** throughout this app.
 | `Usage` | `subject` + `period` | Quota ledger, TTL'd |
 | `RateLimits` | `key` | Burst counters, TTL'd |
 | `Blocks` | `subject` | `manual` (permanent) or `auto` (TTL) |
+| `Locales` | `lang` | LLM-generated UI translations: `name`, `rtl`, `translations`, `usageCount` |
+| `AdminDocs` | `doc_id` | Admin "about me" markdown docs: `title`, `topics`, `content` |
 
 GSIs on `Conversations`: `byUserCreatedAt` (all of a user's convos),
 `byTokenUserCreatedAt` (one token's convos). Created by `ddb:bootstrap` locally.
@@ -200,6 +202,10 @@ deploy or patch the `chatbot-v2-server` Lambda env directly to apply it.
   by `user_id`; Tokens has no GSI for it).
 - OpenNext logs benign `NoSuchBucket`/`EROFS` ISR-cache warnings — no cache
   bucket is wired; harmless for this dynamic app.
+- `Locales`/`AdminDocs` are CREATED by the CDK stack (RETAIN). Do NOT pre-create
+  them in the prod account via `ddb:bootstrap` before the first deploy —
+  CloudFormation CREATE fails on table-already-exists. Local/CI bootstrap still
+  creates them (separate accounts).
 
 ## Environment variables
 

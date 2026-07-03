@@ -31,4 +31,18 @@ describe('admin ops', () => {
   it('rejects unknown op', async () => {
     await expect(runAdminOp({ op: 'nuke' as never, payload: {} as never })).rejects.toThrow();
   });
+  it('deleteLocale removes a poisoned/stored locale row', async () => {
+    const { PutCommand } = await import('@aws-sdk/lib-dynamodb');
+    const { ddb, TABLES } = await import('@/lib/ddb');
+    const lang = `xx-adminop-${Math.floor(Math.random() * 100000)}`;
+    await ddb().send(new PutCommand({
+      TableName: TABLES.Locales,
+      Item: { lang, name: 'Test', rtl: false, translations: {}, usageCount: 0, createdAt: '', lastUsedAt: '' },
+    }));
+    const { getLocale } = await import('@/lib/locales');
+    expect(await getLocale(lang)).not.toBeNull();
+    const res = await runAdminOp({ op: 'deleteLocale', payload: { lang } }) as { deleted: boolean };
+    expect(res.deleted).toBe(true);
+    expect(await getLocale(lang)).toBeNull();
+  });
 });

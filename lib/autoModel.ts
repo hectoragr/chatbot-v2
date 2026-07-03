@@ -23,36 +23,57 @@ const CLASSIFY_PROMPT =
   '"complex" (multi-step reasoning, math proofs, debugging, architecture, long analysis). ' +
   'Reply with only that one word.';
 
+export interface ClassifyOpts {
+  allowedProviders?: Provider[];
+  docTopics?: { doc_id: string; topics: string }[];
+}
+export interface ClassifyResult { model: string; docIds: string[] }
+
+const JSON_CLASSIFY_PROMPT = (docs: { doc_id: string; topics: string }[]) =>
+  'Classify the difficulty of answering the following user question as "simple" (greetings, trivia, short factual answers), ' +
+  '"moderate" (summaries, translations, everyday coding, general explanations), or "complex" (multi-step reasoning, math ' +
+  'proofs, debugging, architecture, long analysis). Also decide which of these reference documents about the site owner, ' +
+  'if any, the question is about:\n' +
+  docs.map((d) => `- ${d.doc_id}: ${d.topics}`).join('\n') +
+  '\nReply with ONLY strict JSON: {"tier":"simple|moderate|complex","docs":["matching_doc_ids_or_empty"]}';
+
+function pickForTier(tier: Tier, allowedProviders?: Provider[]): string {
+  const candidates = TIER_MODELS[tier];
+  if (allowedProviders && allowedProviders.length > 0) {
+    const match = candidates.find((c) => allowedProviders.includes(c.provider));
+    if (match) return match.model;
+  }
+  return candidates[0].model;
+}
+
 /**
- * Picks the cheapest capable model for a message by asking gpt-4.1-nano to
- * rate its difficulty. Never throws — any failure falls back to a safe default
- * so classification can never block a completion.
- *
- * `allowedProviders`, when given, restricts the result to a provider the caller
- * can actually bill (e.g. the providers of the user's active tokens with quota
- * room). The tier's primary candidate is preferred; if it's not allowed, the
- * secondary (same-tier, other-provider) candidate is used instead. If neither
- * is allowed, or `allowedProviders` is omitted/empty, the primary candidate is
- * returned (current/default behavior).
+ * One cheap classifier call, two jobs: difficulty tier (→ model) and about-me
+ * doc matching. Never throws; failures fall back to AUTO_FALLBACK_MODEL and
+ * no docs, so classification can never block a completion.
  */
-export async function pickModelForMessage(message: string, allowedProviders?: Provider[]): Promise<string> {
+export async function classifyMessage(message: string, opts?: ClassifyOpts): Promise<ClassifyResult> {
+  const docTopics = opts?.docTopics ?? [];
   try {
+    const prompt = docTopics.length > 0 ? JSON_CLASSIFY_PROMPT(docTopics) : CLASSIFY_PROMPT;
     const probe: Message = {
       role: 'user',
-      content: `${CLASSIFY_PROMPT}\n\nQuestion:\n${message.slice(0, 2000)}`,
+      content: `${prompt}\n\nQuestion:\n${message.slice(0, 2000)}`,
       createdAt: new Date().toISOString(),
     };
     const { content } = await runCompletion('OPENAI', 'gpt-4.1-nano', [probe]);
-    const tier = content.trim().toLowerCase().match(/\b(simple|moderate|complex)\b/)?.[1] as Tier | undefined;
-    if (!tier) return AUTO_FALLBACK_MODEL;
 
-    const candidates = TIER_MODELS[tier];
-    if (allowedProviders && allowedProviders.length > 0) {
-      const match = candidates.find((c) => allowedProviders.includes(c.provider));
-      if (match) return match.model;
+    if (docTopics.length > 0) {
+      const jsonText = content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+      const parsed = JSON.parse(jsonText) as { tier?: string; docs?: unknown };
+      const tier = ['simple', 'moderate', 'complex'].includes(parsed.tier ?? '') ? (parsed.tier as Tier) : undefined;
+      const known = new Set(docTopics.map((d) => d.doc_id));
+      const docIds = Array.isArray(parsed.docs) ? parsed.docs.filter((d): d is string => typeof d === 'string' && known.has(d)) : [];
+      return { model: tier ? pickForTier(tier, opts?.allowedProviders) : AUTO_FALLBACK_MODEL, docIds };
     }
-    return candidates[0].model;
+
+    const tier = content.trim().toLowerCase().match(/\b(simple|moderate|complex)\b/)?.[1] as Tier | undefined;
+    return { model: tier ? pickForTier(tier, opts?.allowedProviders) : AUTO_FALLBACK_MODEL, docIds: [] };
   } catch {
-    return AUTO_FALLBACK_MODEL;
+    return { model: AUTO_FALLBACK_MODEL, docIds: [] };
   }
 }

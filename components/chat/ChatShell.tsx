@@ -9,12 +9,13 @@ import Button from '@cloudscape-design/components/button';
 import ButtonDropdown from '@cloudscape-design/components/button-dropdown';
 import Modal from '@cloudscape-design/components/modal';
 import SpaceBetween from '@cloudscape-design/components/space-between';
+import Alert from '@cloudscape-design/components/alert';
 import { ConversationList } from './ConversationList';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { SettingsPanel } from './SettingsPanel';
 import { SignupRequestForm } from '@/components/auth/SignupRequestForm';
-import { fetchMe, fetchConversations, sendCompletion, deleteConversation } from '@/lib/client/api';
+import { fetchMe, fetchConversations, sendCompletion, deleteConversation, postContact, fetchCaptcha } from '@/lib/client/api';
 import { conversationToMarkdown, conversationToJson, safeFilename, downloadFile } from '@/lib/client/exportConversation';
 import type { QuotaStatusDTO } from '@/lib/client/api';
 
@@ -39,6 +40,9 @@ export function ChatShell() {
   const [typing, setTyping] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
+  const [contactMode, setContactMode] = useState(false);
+  const [captcha, setCaptcha] = useState<{ id: string; question: string } | null>(null);
+  const [contactStatus, setContactStatus] = useState<'idle' | 'sent' | 'error'>('idle');
 
   useEffect(() => {
     (async () => {
@@ -64,6 +68,7 @@ export function ChatShell() {
     setActiveId(tempId);
     setMessages([]);
     setLastAutoModel(null);
+    setContactMode(false);
   };
 
   const selectConvo = (id: string) => {
@@ -72,14 +77,28 @@ export function ChatShell() {
     setActiveId(id);
     setMessages(c?.messages ?? []);
     setLastAutoModel(null);
+    setContactMode(false);
   };
 
-  const onSend = async (text: string) => {
+  const startContact = async () => {
+    setContactMode(true);
+    setContactStatus('idle');
+    if (!authenticated) setCaptcha(await fetchCaptcha());
+  };
+
+  const onSend = async (text: string, extra?: { captchaAnswer?: string; attachments?: { name: string; kind: string; content: string }[] }): Promise<boolean> => {
+    if (contactMode) {
+      const { status, body } = await postContact({ message: text, captchaId: captcha?.id, captchaAnswer: extra?.captchaAnswer });
+      if (status === 200) { setContactMode(false); setContactStatus('sent'); return true; }
+      setContactStatus('error');
+      if (body?.captcha) setCaptcha(body.captcha);
+      return false;
+    }
     const userMsg: Msg = { role: 'user', content: text, createdAt: new Date().toISOString() };
     setMessages((m) => [...m, userMsg]);
     setTyping(true);
     const realConvoId = activeId?.startsWith(TEMP_PREFIX) ? null : activeId;
-    const { status, body } = await sendCompletion({ message: text, provider, model, conversationId: realConvoId });
+    const { status, body } = await sendCompletion({ message: text, provider, model, conversationId: realConvoId, attachments: extra?.attachments });
     setTyping(false);
     if (status === 402 && body.error === 'provider_tokens_exhausted') {
       const providerName = body.provider ?? provider;
@@ -100,10 +119,16 @@ export function ChatShell() {
         const c = await fetchConversations();
         setConversations(c.conversations ?? []);
       }
+    } else {
+      // Any other unhandled non-200 response: surface a generic error rather
+      // than silently dropping the user's message with no feedback.
+      const errMsg: Msg = { role: 'assistant', content: t('errorMessage'), createdAt: new Date().toISOString() };
+      setMessages((m) => [...m, errMsg]);
     }
     const me = await fetchMe();
     setQuota(me.quota ?? EMPTY_QUOTA);
     if (me.providerRemaining) setProviderRemaining(me.providerRemaining);
+    return true;
   };
 
   const removeConvo = async (id: string) => {
@@ -134,6 +159,7 @@ export function ChatShell() {
       >
         {t('export')}
       </ButtonDropdown>
+      <Button onClick={startContact} iconName="envelope" variant="icon" ariaLabel={t('contactAdmin')} />
       <Button onClick={() => setToolsOpen((o) => !o)} iconName="settings" variant="icon" ariaLabel={t('settings')} />
       {authenticated
         ? <Button onClick={() => setRequestOpen(true)} iconName="key" variant="icon" ariaLabel={t('requestTokens')} />
@@ -163,20 +189,25 @@ export function ChatShell() {
         tools={<SettingsPanel authenticated={authenticated} />}
         content={
           <ContentLayout header={<Header variant="h1" actions={headerActions}>{t('chat')}</Header>}>
-            <Container footer={
-              <ChatInput
-                provider={provider}
-                model={model}
-                onModelChange={handleModelChange}
-                onSend={onSend}
-                quota={quota}
-                pendingApproval={pendingApproval}
-                providerRemaining={providerRemaining}
-                lastAutoModel={lastAutoModel}
-              />
-            }>
-              <MessageList messages={messages} typing={typing} />
-            </Container>
+            <SpaceBetween size="s">
+              {contactStatus === 'sent' && <Alert type="success" dismissible onDismiss={() => setContactStatus('idle')}>{t('contactSent')}</Alert>}
+              {contactStatus === 'error' && <Alert type="error" dismissible onDismiss={() => setContactStatus('idle')}>{t('contactFailed')}</Alert>}
+              <Container footer={
+                <ChatInput
+                  provider={provider}
+                  model={model}
+                  onModelChange={handleModelChange}
+                  onSend={onSend}
+                  quota={quota}
+                  pendingApproval={pendingApproval}
+                  providerRemaining={providerRemaining}
+                  lastAutoModel={lastAutoModel}
+                  contact={contactMode ? { active: true, anon: !authenticated, question: captcha?.question ?? null, onCancel: () => setContactMode(false) } : undefined}
+                />
+              }>
+                <MessageList messages={messages} typing={typing} />
+              </Container>
+            </SpaceBetween>
           </ContentLayout>
         }
       />

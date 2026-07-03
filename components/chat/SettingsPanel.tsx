@@ -7,6 +7,7 @@ import Button from '@cloudscape-design/components/button';
 import Modal from '@cloudscape-design/components/modal';
 import Box from '@cloudscape-design/components/box';
 import Alert from '@cloudscape-design/components/alert';
+import Input from '@cloudscape-design/components/input';
 import { applyMode, Mode } from '@cloudscape-design/global-styles';
 import { useState, useEffect } from 'react';
 import { getCsrf } from '@/lib/client/csrfClient';
@@ -15,6 +16,21 @@ const LANGS = [
   { label: 'English', value: 'en' }, { label: 'Español', value: 'es' },
   { label: 'Français', value: 'fr' }, { label: 'Deutsch', value: 'de' },
 ];
+
+const ADD_VALUE = '__add__';
+
+// Defense in depth: even if a poisoned row (lang === a built-in code, e.g. "en")
+// made it into storage before the server-side guard existed, never surface it
+// here — it would silently override a shipped locale (RTL flip, wrong strings).
+const BUILTIN_LANGS = new Set(['en', 'es', 'fr', 'de']);
+function isSafeDynamicLocale(l: { lang: string }): boolean {
+  return !BUILTIN_LANGS.has(l.lang) && !BUILTIN_LANGS.has(l.lang.split('-')[0]);
+}
+
+function applyDir(rtl: boolean, lang: string) {
+  document.documentElement.dir = rtl ? 'rtl' : 'ltr';
+  document.documentElement.lang = lang;
+}
 
 const THEMES = [
   { label: 'Light', value: 'light' },
@@ -43,7 +59,10 @@ export function SettingsPanel({ authenticated }: { authenticated?: boolean }) {
   const [theme, setTheme] = useState('dark');
   const [deleteModal, setDeleteModal] = useState(false);
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'pending' | 'done' | 'error' | 'submitted'>('idle');
-  const lang = LANGS.find((l) => l.value === i18n.language) ?? LANGS[0];
+  const [dynamicLocales, setDynamicLocales] = useState<{ lang: string; name: string; rtl: boolean }[]>([]);
+  const [addingLang, setAddingLang] = useState(false);
+  const [langInput, setLangInput] = useState('');
+  const [langStatus, setLangStatus] = useState<'idle' | 'pending' | 'error'>('idle');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -51,6 +70,75 @@ export function SettingsPanel({ authenticated }: { authenticated?: boolean }) {
     setTheme(saved);
     applyTheme(saved);
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/locales');
+        const d = await r.json();
+        if (!Array.isArray(d.locales)) return;
+        const safeLocales = d.locales.filter(isSafeDynamicLocale);
+        setDynamicLocales(safeLocales);
+
+        // Restore dynamic-locale bundle + RTL direction for a returning user
+        // whose language (persisted by i18next in localStorage) is a
+        // dynamic, non-built-in locale that isn't loaded into memory yet.
+        const current = safeLocales.find((l: { lang: string; name: string; rtl: boolean }) => l.lang === i18n.language);
+        if (current) {
+          if (!i18n.hasResourceBundle(i18n.language, 'translation')) {
+            const lr = await fetch(`/api/locales/${encodeURIComponent(i18n.language)}`);
+            if (lr.ok) {
+              const { locale } = await lr.json();
+              i18n.addResourceBundle(i18n.language, 'translation', locale.translations);
+            }
+          }
+          await i18n.changeLanguage(i18n.language);
+          applyDir(current.rtl, i18n.language);
+        }
+      } catch {
+        // never break settings panel render
+      }
+    })();
+  }, [i18n]);
+
+  const langOptions = [
+    ...LANGS,
+    ...dynamicLocales.map((l) => ({ label: l.name, value: l.lang })),
+    ...(authenticated ? [{ label: t('addLanguage'), value: ADD_VALUE }] : []),
+  ];
+  const selectedLang = langOptions.find((l) => l.value === i18n.language) ?? LANGS[0];
+
+  const switchLanguage = async (value: string) => {
+    if (value === ADD_VALUE) { setAddingLang(true); return; }
+    const dyn = dynamicLocales.find((l) => l.lang === value);
+    if (dyn && !i18n.hasResourceBundle(value, 'translation')) {
+      const r = await fetch(`/api/locales/${encodeURIComponent(value)}`);
+      if (!r.ok) return;
+      const { locale } = await r.json();
+      i18n.addResourceBundle(value, 'translation', locale.translations);
+    }
+    await i18n.changeLanguage(value);
+    applyDir(dyn?.rtl ?? false, value);
+  };
+
+  const submitNewLanguage = async () => {
+    setLangStatus('pending');
+    try {
+      const csrf = await getCsrf();
+      const r = await fetch('/api/locales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+        body: JSON.stringify({ language: langInput }),
+      });
+      if (!r.ok) { setLangStatus('error'); return; }
+      const { locale } = await r.json();
+      i18n.addResourceBundle(locale.lang, 'translation', locale.translations);
+      setDynamicLocales((ls) => ls.some((l) => l.lang === locale.lang) ? ls : [...ls, { lang: locale.lang, name: locale.name, rtl: locale.rtl }]);
+      await i18n.changeLanguage(locale.lang);
+      applyDir(locale.rtl, locale.lang);
+      setAddingLang(false); setLangInput(''); setLangStatus('idle');
+    } catch { setLangStatus('error'); }
+  };
 
   const requestDeletion = async () => {
     setDeleteStatus('pending');
@@ -68,30 +156,41 @@ export function SettingsPanel({ authenticated }: { authenticated?: boolean }) {
 
   return (
     <>
-      <SpaceBetween size="l">
-        <FormField label={t('language')}>
-          <Select selectedOption={lang} options={LANGS}
-            onChange={({ detail }) => i18n.changeLanguage(detail.selectedOption.value!)} />
-        </FormField>
-        <FormField label={t('appearance')}>
-          <Select
-            selectedOption={THEMES.find((th) => th.value === theme) ?? THEMES[0]}
-            options={THEMES}
-            onChange={({ detail }) => {
-              const v = detail.selectedOption.value!;
-              setTheme(v);
-              applyTheme(v);
-            }}
-          />
-        </FormField>
-        {authenticated && (
-          <FormField label={t('account')}>
-            <Button variant="normal" onClick={() => setDeleteModal(true)}>
-              {t('requestAccountDeletion')}
-            </Button>
+      <Box padding={{ horizontal: 's', vertical: 's' }}>
+        <SpaceBetween size="l">
+          <FormField label={t('language')}>
+            <Select selectedOption={selectedLang} options={langOptions}
+              onChange={({ detail }) => switchLanguage(detail.selectedOption.value!)} />
           </FormField>
-        )}
-      </SpaceBetween>
+          {addingLang && (
+            <FormField label={t('addLanguagePrompt')} errorText={langStatus === 'error' ? t('languageAddFailed') : undefined}>
+              <SpaceBetween size="xs" direction="horizontal">
+                <Input value={langInput} onChange={({ detail }) => setLangInput(detail.value)} />
+                <Button variant="primary" loading={langStatus === 'pending'} onClick={submitNewLanguage}>{t('send')}</Button>
+                <Button variant="link" onClick={() => { setAddingLang(false); setLangStatus('idle'); }}>{t('cancel')}</Button>
+              </SpaceBetween>
+            </FormField>
+          )}
+          <FormField label={t('appearance')}>
+            <Select
+              selectedOption={THEMES.find((th) => th.value === theme) ?? THEMES[0]}
+              options={THEMES}
+              onChange={({ detail }) => {
+                const v = detail.selectedOption.value!;
+                setTheme(v);
+                applyTheme(v);
+              }}
+            />
+          </FormField>
+          {authenticated && (
+            <FormField label={t('account')}>
+              <Button variant="normal" onClick={() => setDeleteModal(true)}>
+                {t('requestAccountDeletion')}
+              </Button>
+            </FormField>
+          )}
+        </SpaceBetween>
+      </Box>
 
       <Modal
         visible={deleteModal}

@@ -12,7 +12,7 @@ const FROM = process.env.SES_FROM_EMAIL || process.env.ADMIN_EMAIL || 'noreply@l
 const SMTP_HOST = process.env.SMTP_HOST || 'localhost';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '1025', 10);
 
-async function send(to: string, subject: string, body: string) {
+async function send(to: string, subject: string, body: string): Promise<boolean> {
   if (isLocal) {
     // Send via Mailpit SMTP — viewable at http://localhost:8025
     try {
@@ -20,7 +20,8 @@ async function send(to: string, subject: string, body: string) {
       await transport.sendMail({ from: FROM, to, subject, text: body });
       console.log(`📧 [email:dev] Sent to ${to} → view at http://localhost:8025`);
     } catch (e) {
-      // Fallback to console if Mailpit isn't running
+      // Fallback to console if Mailpit isn't running — still a successful "send"
+      // from the caller's perspective (dev-only path, nothing to retry).
       console.log('\n📧 [email:dev] ─────────────────────────────');
       console.log(`  To:      ${to}`);
       console.log(`  Subject: ${subject}`);
@@ -28,9 +29,9 @@ async function send(to: string, subject: string, body: string) {
       console.log('────────────────────────────────────────────\n');
       console.log('  (Mailpit not running — install with: docker compose up -d mailpit)');
     }
-    return;
+    return true;
   }
-  if (!FROM) { console.warn('[email] SES_FROM_EMAIL not set, skipping send'); return; }
+  if (!FROM) { console.warn('[email] SES_FROM_EMAIL not set, skipping send'); return false; }
   try {
     await client().send(new SendEmailCommand({
       Source: FROM,
@@ -40,8 +41,10 @@ async function send(to: string, subject: string, body: string) {
         Body: { Text: { Data: body } },
       },
     }));
+    return true;
   } catch (e) {
     console.error('[email] SES send failed:', (e as Error).message);
+    return false;
   }
 }
 
@@ -81,4 +84,8 @@ export async function notifyRequesterDenied(opts: {
     'Your token request was not approved',
     `Hi ${opts.requesterName},\n\nWe were unable to approve your access request at this time. Please contact the administrator for more information.`,
   );
+}
+
+export async function notifyAdminContact(opts: { adminEmail: string; fromLabel: string; message: string }): Promise<boolean> {
+  return send(opts.adminEmail, 'Contact form message', `${opts.message}\n\n—\nFrom: ${opts.fromLabel}`);
 }

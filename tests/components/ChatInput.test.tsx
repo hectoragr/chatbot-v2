@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ChatInput } from '@/components/chat/ChatInput';
 import '@/i18n/config';
 
@@ -14,12 +14,12 @@ describe('ChatInput', () => {
     render(<ChatInput provider="OPENAI" model="gpt-4o-mini" onModelChange={() => {}} onSend={() => {}} quota={{ ...baseQuota, blocked: true }} />);
     expect(screen.getByRole('textbox')).toBeDisabled();
   });
-  it('calls onSend with typed message', () => {
+  it('calls onSend with typed message', async () => {
     const onSend = vi.fn();
     render(<ChatInput provider="OPENAI" model="gpt-4o-mini" onModelChange={() => {}} onSend={onSend} quota={baseQuota} />);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'hi there' } });
     fireEvent.click(screen.getByLabelText(/send/i));
-    expect(onSend).toHaveBeenCalledWith('hi there');
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('hi there', {}));
   });
   it('shows the Auto option as selected when model is auto', () => {
     render(<ChatInput provider="AUTO" model="auto" onModelChange={() => {}} onSend={() => {}} quota={baseQuota} />);
@@ -29,5 +29,53 @@ describe('ChatInput', () => {
   it('shows which model answered in auto mode', () => {
     render(<ChatInput provider="AUTO" model="auto" lastAutoModel="deepseek-chat" onModelChange={() => {}} onSend={() => {}} quota={baseQuota} />);
     expect(screen.getByText(/deepseek-chat/)).toBeInTheDocument();
+  });
+
+  it('shows contact hint and captcha input in anonymous contact mode', () => {
+    render(<ChatInput provider="AUTO" model="auto" onModelChange={() => {}} onSend={() => {}} quota={baseQuota}
+      contact={{ active: true, anon: true, question: '3 + 4', onCancel: () => {} }} />);
+    expect(screen.getByText(/emailed to the site owner/i)).toBeInTheDocument();
+    expect(screen.getByText(/3 \+ 4/)).toBeInTheDocument();
+  });
+
+  it('passes the captcha answer through onSend in contact mode', async () => {
+    const onSend = vi.fn();
+    render(<ChatInput provider="AUTO" model="auto" onModelChange={() => {}} onSend={onSend} quota={baseQuota}
+      contact={{ active: true, anon: true, question: '3 + 4', onCancel: () => {} }} />);
+    fireEvent.change(screen.getByRole('textbox', { name: '' }), { target: { value: 'hello owner' } });
+    const answerInput = screen.getByPlaceholderText('?');
+    fireEvent.change(answerInput, { target: { value: '7' } });
+    fireEvent.click(screen.getByLabelText(/send/i));
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('hello owner', { captchaAnswer: '7' }));
+  });
+
+  it('renders the file upload control', () => {
+    render(<ChatInput provider="AUTO" model="auto" onModelChange={() => {}} onSend={() => {}} quota={baseQuota} />);
+    expect(screen.getAllByText(/attach files/i).length).toBeGreaterThan(0);
+  });
+
+  it('keeps the textarea value when onSend resolves false', async () => {
+    const onSend = vi.fn(async () => false);
+    render(<ChatInput provider="OPENAI" model="gpt-4o-mini" onModelChange={() => {}} onSend={onSend} quota={baseQuota} />);
+    const textarea = screen.getByRole('textbox');
+    fireEvent.change(textarea, { target: { value: 'do not lose me' } });
+    fireEvent.click(screen.getByLabelText(/send/i));
+    await waitFor(() => expect(onSend).toHaveBeenCalled());
+    expect((textarea as HTMLTextAreaElement).value).toBe('do not lose me');
+  });
+
+  it('ignores a rapid second Send click while the first send is still in flight', async () => {
+    let resolveSend: (value: boolean) => void;
+    const onSend = vi.fn(() => new Promise<boolean>((resolve) => { resolveSend = resolve; }));
+    render(<ChatInput provider="OPENAI" model="gpt-4o-mini" onModelChange={() => {}} onSend={onSend} quota={baseQuota} />);
+    const textarea = screen.getByRole('textbox');
+    fireEvent.change(textarea, { target: { value: 'double click me' } });
+    const sendButton = screen.getByLabelText(/send/i);
+    fireEvent.click(sendButton);
+    fireEvent.click(sendButton);
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
+    resolveSend!(true);
+    await waitFor(() => expect((textarea as HTMLTextAreaElement).value).toBe(''));
+    expect(onSend).toHaveBeenCalledTimes(1);
   });
 });

@@ -22,6 +22,8 @@ export const TABLES = {
   TokenRequests: process.env.DDB_TOKENS_REQUEST || 'TokenRequests',
   Usage: process.env.DDB_USAGE || 'Usage',
   Blocks: process.env.DDB_BLOCKS || 'Blocks',
+  Locales: process.env.DDB_LOCALES || 'Locales',
+  AdminDocs: process.env.DDB_ADMIN_DOCS || 'AdminDocs',
 };
 
 export type TokenDoc = {
@@ -104,3 +106,21 @@ export type BlockDoc = {
   createdAt: string;
   ttl?: number;      // epoch seconds; omitted for manual (permanent) blocks
 };
+
+export interface LocaleDoc {
+  lang: string;              // BCP-47 code, table key
+  name: string;              // native display name
+  rtl: boolean;
+  translations: Record<string, string>;
+  usageCount: number;
+  createdAt: string;
+  lastUsedAt: string;
+}
+
+export interface AdminDocDoc {
+  doc_id: string;            // slug, table key
+  title: string;
+  topics: string;            // comma-separated keywords shown to the classifier
+  content: string;           // markdown, <= 300KB
+  updatedAt: string;
+}

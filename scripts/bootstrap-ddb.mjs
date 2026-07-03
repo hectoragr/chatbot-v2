@@ -34,7 +34,9 @@ const Tables = {
   TokenRequests: process.env.DDB_TOKEN_REQUESTS || "TokenRequests",
   RateLimits: process.env.DDB_RATELIMITS || "RateLimits",
   Usage: process.env.DDB_USAGE || "Usage",
-  Blocks: process.env.DDB_BLOCKS || "Blocks"
+  Blocks: process.env.DDB_BLOCKS || "Blocks",
+  Locales: process.env.DDB_LOCALES || "Locales",
+  AdminDocs: process.env.DDB_ADMIN_DOCS || "AdminDocs"
 };
 
 async function ensureTable(params) {
@@ -49,7 +51,7 @@ async function ensureTable(params) {
 
 async function purgeAll() {
   const existing = await client.send(new ListTablesCommand({}));
-  for (const name of [Tables.Tokens, Tables.Users, Tables.Conversations, Tables.TokenRequests, Tables.RateLimits, Tables.Usage, Tables.Blocks]) {
+  for (const name of [Tables.Tokens, Tables.Users, Tables.Conversations, Tables.TokenRequests, Tables.RateLimits, Tables.Usage, Tables.Blocks, Tables.Locales, Tables.AdminDocs]) {
     if (existing.TableNames?.includes(name)) {
       await client.send(new DeleteTableCommand({ TableName: name }));
       console.log(`🗑️ Deleted: ${name}`);
@@ -207,6 +209,22 @@ async function createTables() {
   } else {
     console.log(`✅ Table exists: ${Tables.Blocks}`);
   }
+
+  // Locales table (batch 2)
+  await ensureTable({
+    TableName: Tables.Locales,
+    AttributeDefinitions: [{ AttributeName: "lang", AttributeType: "S" }],
+    KeySchema: [{ AttributeName: "lang", KeyType: "HASH" }],
+    BillingMode: "PAY_PER_REQUEST"
+  });
+
+  // AdminDocs table (batch 2)
+  await ensureTable({
+    TableName: Tables.AdminDocs,
+    AttributeDefinitions: [{ AttributeName: "doc_id", AttributeType: "S" }],
+    KeySchema: [{ AttributeName: "doc_id", KeyType: "HASH" }],
+    BillingMode: "PAY_PER_REQUEST"
+  });
 }
 
 async function main() {

@@ -10,7 +10,8 @@ import { TokensTable } from '@/components/admin/TokensTable';
 import { ConversationsTable } from '@/components/admin/ConversationsTable';
 import { TokenRequestsTable } from '@/components/admin/TokenRequestsTable';
 import { BlocksTable } from '@/components/admin/BlocksTable';
-import type { UserDoc, TokenDoc, ConversationDoc, TokenRequestDoc, BlockDoc } from '@/lib/ddb';
+import { AdminDocsPanel } from '@/components/admin/AdminDocsPanel';
+import type { UserDoc, TokenDoc, ConversationDoc, TokenRequestDoc, BlockDoc, AdminDocDoc } from '@/lib/ddb';
 
 interface AdminTables {
   users?: UserDoc[];
@@ -18,6 +19,7 @@ interface AdminTables {
   conversations?: ConversationDoc[];
   unprocessedTokens?: TokenRequestDoc[];
   blocks?: BlockDoc[];
+  adminDocs?: AdminDocDoc[];
 }
 
 export default function AdminPage() {
@@ -45,6 +47,7 @@ export default function AdminPage() {
           <UsersTable users={tables.users ?? []} onRefresh={load} />
           <TokensTable items={tables.tokens ?? []} onRefresh={load} />
           <BlocksTable items={tables.blocks ?? []} onRefresh={load} />
+          <AdminDocsPanel docs={tables.adminDocs ?? []} onRefresh={load} />
           <ConversationsTable items={tables.conversations ?? []} />
         </SpaceBetween>
       </ContentLayout>

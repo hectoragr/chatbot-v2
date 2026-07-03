@@ -40,13 +40,18 @@ vi.mock('@/lib/tokens', () => ({
   incrementTokenUsed: vi.fn(async () => {}),
 }));
 
-// Real pickModelForMessage logic is exercised (not mocked) so this test proves
+// Real classifyMessage logic is exercised (not mocked) so this test proves
 // the route wires allowedProviders through correctly; only the underlying
 // classifier network call (lib/providers.runCompletion) is mocked to return a
 // "moderate" classification. The same mock also serves as the real completion
 // call (route calls runCompletion twice: once to classify, once to answer).
 vi.mock('@/lib/providers', () => ({
   runCompletion: vi.fn(async () => ({ content: 'moderate', estimatedTokens: 50 })),
+}));
+
+vi.mock('@/lib/adminDocs', () => ({
+  listDocTopics: vi.fn(async () => []),
+  getDocsForInjection: vi.fn(async () => ''),
 }));
 
 vi.mock('@/lib/quota', async (importOriginal) => {
