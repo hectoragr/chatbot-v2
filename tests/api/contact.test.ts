@@ -47,14 +47,15 @@ describe('contact route', () => {
   });
 
   it('sends for authenticated users without captcha, email signature', async () => {
-    sessionUser.current = { email: 'u@x.com' };
+    const email = `auth-${Date.now()}@x.com`;
+    sessionUser.current = { email };
     const res = await POST(makeReq({ message: 'hello' }));
     expect(res.status).toBe(200);
-    expect(emailSpy).toHaveBeenCalledWith(expect.objectContaining({ fromLabel: 'u@x.com' }));
+    expect(emailSpy).toHaveBeenCalledWith(expect.objectContaining({ fromLabel: email }));
   });
 
   it('rejects oversized messages', async () => {
-    sessionUser.current = { email: 'u@x.com' };
+    sessionUser.current = { email: `oversized-${Date.now()}@x.com` };
     const res = await POST(makeReq({ message: 'x'.repeat(2001) }));
     expect(res.status).toBe(400);
   });

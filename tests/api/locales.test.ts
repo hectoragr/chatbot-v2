@@ -35,7 +35,7 @@ describe('locales routes', () => {
   });
 
   it('POST rejects injection-looking input', async () => {
-    sessionUser.current = { email: 'u@x.com' };
+    sessionUser.current = { email: `injection-${Date.now()}@x.com` };
     expect((await POST(postReq({ language: '<script>alert(1)</script>' }))).status).toBe(400);
   });
 
@@ -63,7 +63,7 @@ describe('locales routes', () => {
   });
 
   it('POST returns 400 when the LLM says not a language', async () => {
-    sessionUser.current = { email: 'u2@x.com' };
+    sessionUser.current = { email: `notlang-${Date.now()}@x.com` };
     vi.mocked(runCompletion).mockResolvedValue({ content: '{"error":"not_a_language"}', estimatedTokens: 1 });
     expect((await POST(postReq({ language: 'blorptalk' }))).status).toBe(400);
   });
