@@ -46,7 +46,7 @@ describe('completions auto mode', () => {
     expect(body.modelUsed).toBe('deepseek-chat');
     expect(vi.mocked(classifyMessage)).toHaveBeenCalledWith('hello', { allowedProviders: undefined, docTopics: undefined });
     // Provider derived from the resolved model, not the client-sent 'AUTO'.
-    expect(vi.mocked(runCompletion)).toHaveBeenCalledWith('DEEPSEEK', 'deepseek-chat', expect.any(Array));
+    expect(vi.mocked(runCompletion)).toHaveBeenCalledWith('DEEPSEEK', 'deepseek-chat', expect.any(Array), undefined, undefined);
   });
 
   it('reports modelUsed on non-auto requests too', async () => {

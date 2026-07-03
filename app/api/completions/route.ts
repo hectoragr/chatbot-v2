@@ -14,17 +14,23 @@ import type { Message } from '@/lib/ddb';
 import { selectTokenForProvider } from './selectTokenForProvider';
 import { classifyMessage } from '@/lib/autoModel';
 import { listDocTopics, getDocsForInjection } from '@/lib/adminDocs';
+import { validateAttachments, attachmentPromptBlocks, attachmentStoredBlocks, imageUrls, isVisionModel, ATTACHMENT_GUARD, IMAGE_TOKEN_COST, VISION_FALLBACK_MODEL } from '@/lib/attachments';
 
 export async function POST(req: Request) {
   if (!verifyCSRFTokenValue(req.headers.get('x-csrf-token'))) {
     return json({ error: 'CSRF_TOKEN_INVALID' }, 403);
   }
   try {
-    const { message, conversationId, provider, model } = await req.json();
+    const { message, conversationId, provider, model, attachments } = await req.json();
     if (!message || !provider) return json({ error: 'message and provider required' }, 400);
     if (model !== undefined && typeof model !== 'string') return json({ error: 'invalid model' }, 400);
     if (provider !== 'AUTO' && provider !== 'OPENAI' && provider !== 'DEEPSEEK') return json({ error: 'invalid provider' }, 400);
     if (provider === 'AUTO' && model !== 'auto') return json({ error: 'invalid model for AUTO provider' }, 400);
+
+    const attVal = validateAttachments(attachments);
+    if ('error' in attVal) return json({ error: attVal.error }, 400);
+    const atts = attVal.ok;
+    const images = imageUrls(atts);
 
     const subject = await resolveSubject(req);
 
@@ -73,6 +79,10 @@ export async function POST(req: Request) {
     } else if (docTopics.length > 0) {
       docIds = (await classifyMessage(String(message), { docTopics })).docIds;
     }
+    if (images.length > 0) {
+      effectiveProvider = 'OPENAI';
+      if (!isVisionModel(effectiveModel)) effectiveModel = VISION_FALLBACK_MODEL;
+    }
     const chosenModel = isValidModel(effectiveProvider, effectiveModel) ? effectiveModel : defaultModel(effectiveProvider);
 
     // Anonymous users are not persisted; logged-in users get conversations.
@@ -82,8 +92,12 @@ export async function POST(req: Request) {
       : null;
 
     const now = new Date().toISOString();
-    const userMsg: Message = { role: 'user', content: String(message), createdAt: now };
-    const history: Message[] = [...(convo?.messages ?? []), userMsg];
+    const promptBlocks = atts.length ? attachmentPromptBlocks(atts) : '';
+    const promptText = promptBlocks ? `${String(message)}\n\n${promptBlocks}` : String(message);
+    const storedText = atts.length ? `${String(message)}\n\n${attachmentStoredBlocks(atts)}` : String(message);
+    const userMsg: Message = { role: 'user', content: storedText, createdAt: now };
+    const promptUserMsg: Message = { role: 'user', content: promptText, createdAt: now };
+    const history: Message[] = [...(convo?.messages ?? []), promptUserMsg];
 
     let providerHistory: Message[] = history;
     if (docIds.length > 0) {
@@ -96,8 +110,11 @@ export async function POST(req: Request) {
         }, ...history];
       }
     }
-    const result = await runCompletion(effectiveProvider, chosenModel, providerHistory);
-    const cost = result.estimatedTokens;
+    if (atts.length > 0) {
+      providerHistory = [{ role: 'system', content: ATTACHMENT_GUARD, createdAt: now }, ...providerHistory];
+    }
+    const result = await runCompletion(effectiveProvider, chosenModel, providerHistory, undefined, images.length ? { images } : undefined);
+    const cost = result.estimatedTokens + images.length * IMAGE_TOKEN_COST;
 
     const assistantMsg: Message = { role: 'assistant', content: result.content, createdAt: new Date().toISOString() };
 

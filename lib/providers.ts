@@ -22,6 +22,7 @@ export async function runCompletion(
   model: string | undefined,
   messages: ChatMessage[],
   promptId?: string,
+  opts?: { images?: string[] },
 ): Promise<ProviderResult> {
   const text = messages.map((m) => `${m.role}: ${m.content}`).join('\n');
   const promptToks = approxTokens(text);
@@ -42,6 +43,20 @@ export async function runCompletion(
         model: mdl,
         messages: mapMsgs(messages, systemMessage, reasoning),
       };
+
+      // Attach images to the final user message as multimodal parts.
+      if (opts?.images?.length) {
+        const msgs = body.messages as { role: string; content: unknown }[];
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          if (msgs[i].role === 'user') {
+            msgs[i].content = [
+              { type: 'text', text: String(msgs[i].content) },
+              ...opts.images.map((url) => ({ type: 'image_url', image_url: { url } })),
+            ];
+            break;
+          }
+        }
+      }
 
       // Reasoning models don't support temperature
       if (!reasoning) {
