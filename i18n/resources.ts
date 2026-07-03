@@ -53,6 +53,9 @@ export const resources = {
 
       // Settings Panel
       "language": "Language",
+      "addLanguage": "Add language…",
+      "addLanguagePrompt": "Which language? (e.g. 中文, Arabic, Polski)",
+      "languageAddFailed": "Could not add that language.",
       "appearance": "Appearance",
       "account": "Account",
       "requestAccountDeletion": "Request account deletion",
@@ -160,6 +163,9 @@ export const resources = {
 
       // Settings Panel
       "language": "Idioma",
+      "addLanguage": "Añadir idioma…",
+      "addLanguagePrompt": "¿Qué idioma? (p. ej. 中文, árabe, Polski)",
+      "languageAddFailed": "No se pudo añadir ese idioma.",
       "appearance": "Apariencia",
       "account": "Cuenta",
       "requestAccountDeletion": "Solicitar eliminación de cuenta",
@@ -268,6 +274,9 @@ export const resources = {
 
       // Settings Panel
       "language": "Langue",
+      "addLanguage": "Ajouter une langue…",
+      "addLanguagePrompt": "Quelle langue ? (ex. 中文, arabe, Polski)",
+      "languageAddFailed": "Impossible d'ajouter cette langue.",
       "appearance": "Apparence",
       "account": "Compte",
       "requestAccountDeletion": "Demander la suppression du compte",
@@ -376,6 +385,9 @@ export const resources = {
 
       // Settings Panel
       "language": "Sprache",
+      "addLanguage": "Sprache hinzufügen…",
+      "addLanguagePrompt": "Welche Sprache? (z. B. 中文, Arabisch, Polski)",
+      "languageAddFailed": "Diese Sprache konnte nicht hinzugefügt werden.",
       "appearance": "Erscheinungsbild",
       "account": "Konto",
       "requestAccountDeletion": "Kontolöschung anfordern",
