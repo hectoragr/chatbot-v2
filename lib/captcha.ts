@@ -19,6 +19,12 @@ export function issueCaptcha(): { id: string; question: string } {
   return { id, question: `${a} + ${b}` };
 }
 
+// This is stateless: the same captcha id is replayable any number of times
+// within its TTL_MS window, since there's no server-side store marking it
+// "used". That's by design — adding a used-ids store would need persistence
+// (DDB or in-memory-per-Lambda, neither free) just to block a low-value
+// replay. The contact route's 5/day rate cap per subject already bounds how
+// much abuse a replayed captcha can enable.
 export function verifyCaptcha(id: string, answer: string): boolean {
   try {
     const { nonce, exp, sig } = JSON.parse(Buffer.from(String(id), 'base64url').toString());

@@ -2,7 +2,7 @@ import { getSystemPrompt } from './prompts.js';
 
 import type { Message as ChatMessage } from './ddb.js';
 
-type ProviderResult = { content: string; estimatedTokens: number };
+type ProviderResult = { content: string; estimatedTokens: number; providerError?: boolean };
 
 const approxTokens = (s: string) => Math.max(1, Math.ceil((s || '').length / 4));
 
@@ -72,7 +72,7 @@ export async function runCompletion(
       if (!r.ok || data?.error) {
         console.error(`[providers] OpenAI ${mdl} error:`, JSON.stringify(data?.error ?? data));
         const errMsg = data?.error?.message ?? 'OpenAI API error';
-        return { content: `⚠️ ${errMsg}`, estimatedTokens: promptToks };
+        return { content: `⚠️ ${errMsg}`, estimatedTokens: promptToks, providerError: true };
       }
       const content = data?.choices?.[0]?.message?.content ?? '';
       return { content, estimatedTokens: promptToks + approxTokens(content) };
@@ -88,7 +88,7 @@ export async function runCompletion(
       if (!r.ok || data?.error) {
         console.error(`[providers] DeepSeek ${mdl} error:`, JSON.stringify(data?.error ?? data));
         const errMsg = data?.error?.message ?? 'DeepSeek API error';
-        return { content: `⚠️ ${errMsg}`, estimatedTokens: promptToks };
+        return { content: `⚠️ ${errMsg}`, estimatedTokens: promptToks, providerError: true };
       }
       const content = data?.choices?.[0]?.message?.content ?? '';
       return { content, estimatedTokens: promptToks + approxTokens(content) };

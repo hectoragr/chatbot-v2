@@ -32,13 +32,15 @@ export async function POST(req: Request) {
       return json({ error: 'captcha_failed', captcha: issueCaptcha() }, 403);
     }
 
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail) return json({ error: 'contact not configured' }, 500);
+
     const subjectKey = `contact:${user?.email ?? `anon:${ip}`}`;
     const count = await updateRateLimit(subjectKey, 1, 24 * 3600);
     if (count > DAILY_CAP) return json({ error: 'rate_limited' }, 429);
 
-    const adminEmail = process.env.ADMIN_EMAIL;
-    if (!adminEmail) return json({ error: 'contact not configured' }, 500);
-    await notifyAdminContact({ adminEmail, fromLabel: user?.email ?? 'anonymous visitor', message: clean });
+    const sent = await notifyAdminContact({ adminEmail, fromLabel: user?.email ?? 'anonymous visitor', message: clean });
+    if (!sent) return json({ error: 'send_failed' }, 502);
     return json({ valid: true });
   } catch (e) {
     return fail((e as Error)?.message);

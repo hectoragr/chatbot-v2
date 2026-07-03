@@ -19,6 +19,14 @@ const LANGS = [
 
 const ADD_VALUE = '__add__';
 
+// Defense in depth: even if a poisoned row (lang === a built-in code, e.g. "en")
+// made it into storage before the server-side guard existed, never surface it
+// here — it would silently override a shipped locale (RTL flip, wrong strings).
+const BUILTIN_LANGS = new Set(['en', 'es', 'fr', 'de']);
+function isSafeDynamicLocale(l: { lang: string }): boolean {
+  return !BUILTIN_LANGS.has(l.lang) && !BUILTIN_LANGS.has(l.lang.split('-')[0]);
+}
+
 function applyDir(rtl: boolean, lang: string) {
   document.documentElement.dir = rtl ? 'rtl' : 'ltr';
   document.documentElement.lang = lang;
@@ -69,12 +77,13 @@ export function SettingsPanel({ authenticated }: { authenticated?: boolean }) {
         const r = await fetch('/api/locales');
         const d = await r.json();
         if (!Array.isArray(d.locales)) return;
-        setDynamicLocales(d.locales);
+        const safeLocales = d.locales.filter(isSafeDynamicLocale);
+        setDynamicLocales(safeLocales);
 
         // Restore dynamic-locale bundle + RTL direction for a returning user
         // whose language (persisted by i18next in localStorage) is a
         // dynamic, non-built-in locale that isn't loaded into memory yet.
-        const current = d.locales.find((l: { lang: string; name: string; rtl: boolean }) => l.lang === i18n.language);
+        const current = safeLocales.find((l: { lang: string; name: string; rtl: boolean }) => l.lang === i18n.language);
         if (current) {
           if (!i18n.hasResourceBundle(i18n.language, 'translation')) {
             const lr = await fetch(`/api/locales/${encodeURIComponent(i18n.language)}`);

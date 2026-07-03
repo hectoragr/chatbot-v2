@@ -53,4 +53,14 @@ describe('ChatInput', () => {
     render(<ChatInput provider="AUTO" model="auto" onModelChange={() => {}} onSend={() => {}} quota={baseQuota} />);
     expect(screen.getAllByText(/attach files/i).length).toBeGreaterThan(0);
   });
+
+  it('keeps the textarea value when onSend resolves false', async () => {
+    const onSend = vi.fn(async () => false);
+    render(<ChatInput provider="OPENAI" model="gpt-4o-mini" onModelChange={() => {}} onSend={onSend} quota={baseQuota} />);
+    const textarea = screen.getByRole('textbox');
+    fireEvent.change(textarea, { target: { value: 'do not lose me' } });
+    fireEvent.click(screen.getByLabelText(/send/i));
+    await waitFor(() => expect(onSend).toHaveBeenCalled());
+    expect((textarea as HTMLTextAreaElement).value).toBe('do not lose me');
+  });
 });

@@ -68,6 +68,7 @@ export function ChatShell() {
     setActiveId(tempId);
     setMessages([]);
     setLastAutoModel(null);
+    setContactMode(false);
   };
 
   const selectConvo = (id: string) => {
@@ -76,6 +77,7 @@ export function ChatShell() {
     setActiveId(id);
     setMessages(c?.messages ?? []);
     setLastAutoModel(null);
+    setContactMode(false);
   };
 
   const startContact = async () => {
@@ -84,12 +86,13 @@ export function ChatShell() {
     if (!authenticated) setCaptcha(await fetchCaptcha());
   };
 
-  const onSend = async (text: string, extra?: { captchaAnswer?: string; attachments?: { name: string; kind: string; content: string }[] }) => {
+  const onSend = async (text: string, extra?: { captchaAnswer?: string; attachments?: { name: string; kind: string; content: string }[] }): Promise<boolean> => {
     if (contactMode) {
       const { status, body } = await postContact({ message: text, captchaId: captcha?.id, captchaAnswer: extra?.captchaAnswer });
-      if (status === 200) { setContactMode(false); setContactStatus('sent'); }
-      else { setContactStatus('error'); if (body?.captcha) setCaptcha(body.captcha); }
-      return;
+      if (status === 200) { setContactMode(false); setContactStatus('sent'); return true; }
+      setContactStatus('error');
+      if (body?.captcha) setCaptcha(body.captcha);
+      return false;
     }
     const userMsg: Msg = { role: 'user', content: text, createdAt: new Date().toISOString() };
     setMessages((m) => [...m, userMsg]);
@@ -116,10 +119,16 @@ export function ChatShell() {
         const c = await fetchConversations();
         setConversations(c.conversations ?? []);
       }
+    } else {
+      // Any other unhandled non-200 response: surface a generic error rather
+      // than silently dropping the user's message with no feedback.
+      const errMsg: Msg = { role: 'assistant', content: t('errorMessage'), createdAt: new Date().toISOString() };
+      setMessages((m) => [...m, errMsg]);
     }
     const me = await fetchMe();
     setQuota(me.quota ?? EMPTY_QUOTA);
     if (me.providerRemaining) setProviderRemaining(me.providerRemaining);
+    return true;
   };
 
   const removeConvo = async (id: string) => {

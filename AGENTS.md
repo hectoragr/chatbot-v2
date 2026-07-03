@@ -202,6 +202,10 @@ deploy or patch the `chatbot-v2-server` Lambda env directly to apply it.
   by `user_id`; Tokens has no GSI for it).
 - OpenNext logs benign `NoSuchBucket`/`EROFS` ISR-cache warnings — no cache
   bucket is wired; harmless for this dynamic app.
+- `Locales`/`AdminDocs` are CREATED by the CDK stack (RETAIN). Do NOT pre-create
+  them in the prod account via `ddb:bootstrap` before the first deploy —
+  CloudFormation CREATE fails on table-already-exists. Local/CI bootstrap still
+  creates them (separate accounts).
 
 ## Environment variables
 

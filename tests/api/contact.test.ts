@@ -10,8 +10,10 @@ process.env.ADMIN_EMAIL = 'admin@test.local';
 
 const sessionUser = vi.hoisted(() => ({ current: null as null | { email: string; name?: string } }));
 vi.mock('@/lib/auth', () => ({ getSessionUser: vi.fn(async () => sessionUser.current), isAdminEmail: () => false }));
-const emailSpy = vi.hoisted(() => vi.fn(async () => {}));
+const emailSpy = vi.hoisted(() => vi.fn(async () => true));
 vi.mock('@/lib/email', () => ({ notifyAdminContact: emailSpy }));
+const abuseSpy = vi.hoisted(() => ({ blocked: false }));
+vi.mock('@/lib/abuse', () => ({ recordHitAndMaybeBlock: vi.fn(async () => abuseSpy.blocked) }));
 
 const { POST } = await import('@/app/api/contact/route');
 const { generateCSRFToken } = await import('@/lib/csrf');
@@ -26,7 +28,7 @@ function makeReq(body: Record<string, unknown>, ip = `10.9.${Math.floor(Math.ran
   });
 }
 
-beforeEach(() => { emailSpy.mockClear(); sessionUser.current = null; });
+beforeEach(() => { emailSpy.mockClear(); sessionUser.current = null; abuseSpy.blocked = false; });
 
 describe('contact route', () => {
   it('rejects anonymous senders without a valid captcha and reissues one', async () => {
@@ -66,5 +68,56 @@ describe('contact route', () => {
       expect((await POST(makeReq({ message: 'm' }))).status).toBe(200);
     }
     expect((await POST(makeReq({ message: 'm' }))).status).toBe(429);
+  });
+
+  it('rejects a blocked subject with 403 and never calls the email spy', async () => {
+    sessionUser.current = { email: `blocked-${Date.now()}@x.com` };
+    abuseSpy.blocked = true;
+    const res = await POST(makeReq({ message: 'hi admin' }));
+    expect(res.status).toBe(403);
+    expect(emailSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns 500 before consuming a rate-limit slot when ADMIN_EMAIL is unset', async () => {
+    const email = `noadmin-${Date.now()}@x.com`;
+    sessionUser.current = { email };
+    const original = process.env.ADMIN_EMAIL;
+    delete process.env.ADMIN_EMAIL;
+    try {
+      const res = await POST(makeReq({ message: 'hi admin' }));
+      expect(res.status).toBe(500);
+      expect(emailSpy).not.toHaveBeenCalled();
+    } finally {
+      process.env.ADMIN_EMAIL = original;
+    }
+    // The failed attempt above must not have consumed a daily rate-limit slot:
+    // all 5 allowed sends should still succeed now that ADMIN_EMAIL is restored.
+    for (let i = 0; i < 5; i++) {
+      expect((await POST(makeReq({ message: 'm' }))).status).toBe(200);
+    }
+    expect((await POST(makeReq({ message: 'm' }))).status).toBe(429);
+  });
+
+  it('returns 502 when notifyAdminContact fails to send', async () => {
+    sessionUser.current = { email: `sendfail-${Date.now()}@x.com` };
+    emailSpy.mockResolvedValueOnce(false);
+    const res = await POST(makeReq({ message: 'hi admin' }));
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toBe('send_failed');
+  });
+
+  it('strips control chars (zero-width) while preserving \\n and \\t before the email spy sees the message', async () => {
+    sessionUser.current = { email: `ctrl-${Date.now()}@x.com` };
+    const zeroWidth = '​'; // zero-width space (Cf category)
+    const raw = `line1${zeroWidth}\nline2\tindented${zeroWidth}`;
+    const res = await POST(makeReq({ message: raw }));
+    expect(res.status).toBe(200);
+    const lastCall = emailSpy.mock.calls.at(-1) as unknown as [{ message: string }];
+    const sentMessage = lastCall[0].message;
+    expect(sentMessage).not.toContain(zeroWidth);
+    expect(sentMessage).toContain('\n');
+    expect(sentMessage).toContain('\t');
+    expect(sentMessage).toBe('line1\nline2\tindented');
   });
 });

@@ -36,4 +36,20 @@ describe('admin routes', () => {
     const res = await DELETE(new Request('http://x?subject=ip:1.2.3.4', { method: 'DELETE' }));
     expect(res.status).toBe(403);
   });
+  it('locales DELETE returns 403 when CSRF missing', async () => {
+    const { DELETE } = await import('@/app/api/admin/locales/route');
+    const res = await DELETE(new Request('http://x', { method: 'DELETE', body: JSON.stringify({ lang: 'xx' }) }));
+    expect(res.status).toBe(403);
+  });
+  it('locales DELETE returns 401 when CSRF valid but not admin', async () => {
+    const { generateCSRFToken } = await import('@/lib/csrf');
+    const { DELETE } = await import('@/app/api/admin/locales/route');
+    const { token } = generateCSRFToken('http://x');
+    const res = await DELETE(new Request('http://x', {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json', 'x-csrf-token': token },
+      body: JSON.stringify({ lang: 'xx' }),
+    }));
+    expect(res.status).toBe(401);
+  });
 });

@@ -16,6 +16,10 @@ import type { QuotaStatusDTO } from '@/lib/client/api';
 
 const MAX_FILES = 3;
 const MAX_BYTES = 2 * 1024 * 1024;
+// Images are base64-encoded before they travel to the server (~1.37x inflation),
+// so a raw file cap is needed to keep the encoded payload under the server's
+// 2MB per-attachment char cap (MAX_ATTACHMENT_CHARS in lib/attachments.ts).
+const MAX_IMAGE_BYTES = Math.floor(1.4 * 1024 * 1024);
 const IMAGE_MIMES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 
 function kindOf(f: File): 'text' | 'json' | 'image' | null {
@@ -38,7 +42,10 @@ interface Props {
   provider: string;
   model: string;
   onModelChange: (provider: string, modelId: string) => void;
-  onSend: (message: string, extra?: { captchaAnswer?: string; attachments?: { name: string; kind: string; content: string }[] }) => void;
+  onSend: (
+    message: string,
+    extra?: { captchaAnswer?: string; attachments?: { name: string; kind: string; content: string }[] },
+  ) => Promise<boolean | void> | boolean | void;
   quota: QuotaStatusDTO;
   pendingApproval?: boolean;
   providerRemaining?: Record<string, number>;
@@ -59,20 +66,34 @@ export function ChatInput({ model, onModelChange, onSend, quota, pendingApproval
     const attachments: { name: string; kind: string; content: string }[] = [];
     for (const f of files.slice(0, MAX_FILES)) {
       const kind = kindOf(f);
-      if (!kind || f.size > MAX_BYTES) { setFileError(t('attachInvalid')); return; }
-      attachments.push({ name: f.name, kind, content: kind === 'image' ? await readAsDataUrl(f) : await f.text() });
+      if (!kind) { setFileError(t('attachInvalid')); return; }
+      const byteCap = kind === 'image' ? MAX_IMAGE_BYTES : MAX_BYTES;
+      if (f.size > byteCap) { setFileError(t('attachInvalid')); return; }
+      const content = kind === 'image' ? await readAsDataUrl(f) : await f.text();
+      if (kind === 'json') {
+        try { JSON.parse(content); } catch { setFileError(t('attachInvalid')); return; }
+      }
+      attachments.push({ name: f.name, kind, content });
     }
-    onSend(value.trim(), {
+    const ok = await onSend(value.trim(), {
       ...(contact?.active && contact.anon ? { captchaAnswer } : {}),
       ...(attachments.length ? { attachments } : {}),
     });
+    if (ok === false) return;
     setValue('');
     setCaptchaAnswer('');
     setFiles([]);
   };
 
   useEffect(() => {
-    if (contact?.active) setValue((v) => (v.trim() === '' ? t('contactTemplate') : v));
+    if (contact?.active) {
+      setValue((v) => (v.trim() === '' ? t('contactTemplate') : v));
+    } else {
+      // Leaving contact mode (cancel): only clear the composer if the user
+      // never touched the auto-filled template — otherwise a drafted message
+      // would be silently wiped out from under them.
+      setValue((v) => (v === t('contactTemplate') ? '' : v));
+    }
   }, [contact?.active]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

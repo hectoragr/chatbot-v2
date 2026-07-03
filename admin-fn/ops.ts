@@ -3,6 +3,10 @@ import { listUsers, updateUser, deleteUserById, createUserIfNotExists } from '..
 import { listConversations, getConversationsByUser, deleteConversation } from '../lib/conversations.js';
 import { listBlocks, addBlock, removeBlock } from '../lib/blocks.js';
 import { putAdminDoc, deleteAdminDoc, listAdminDocs, invalidateDocTopicsCache } from '../lib/adminDocs.js';
+import { deleteLocale } from '../lib/locales.js';
+// Note: lib/locales.js also imports `@/i18n/resources` for generateLocale/validateLocaleBundle,
+// which are unused here (deleteLocale is a plain DDB delete). NodejsFunction resolves the
+// project-root tsconfig's `@/*` path alias when bundling admin-fn, same as the rest of lib/.
 
 export type AdminOp =
   | { op: 'listTables'; payload: Record<string, never> }
@@ -18,7 +22,8 @@ export type AdminOp =
   | { op: 'listBlocks'; payload: Record<string, never> }
   | { op: 'purgeUser'; payload: { email: string } }
   | { op: 'putAdminDoc'; payload: { doc_id?: string; title: string; topics: string; content: string } }
-  | { op: 'deleteAdminDoc'; payload: { doc_id: string } };
+  | { op: 'deleteAdminDoc'; payload: { doc_id: string } }
+  | { op: 'deleteLocale'; payload: { lang: string } };
 
 export async function runAdminOp(cmd: AdminOp): Promise<unknown> {
   switch (cmd.op) {
@@ -70,6 +75,9 @@ export async function runAdminOp(cmd: AdminOp): Promise<unknown> {
     case 'deleteAdminDoc':
       await deleteAdminDoc(cmd.payload.doc_id);
       invalidateDocTopicsCache();
+      return { deleted: true };
+    case 'deleteLocale':
+      await deleteLocale(cmd.payload.lang);
       return { deleted: true };
     default:
       throw new Error('UNKNOWN_ADMIN_OP');

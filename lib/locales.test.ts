@@ -7,7 +7,7 @@ process.env.AWS_REGION = 'us-east-1';
 
 vi.mock('./providers', () => ({ runCompletion: vi.fn() }));
 const { runCompletion } = await import('./providers');
-const { sanitizeLanguageInput, validateLocaleBundle, generateLocale, getLocale } = await import('./locales');
+const { sanitizeLanguageInput, validateLocaleBundle, generateLocale, getLocale, deleteLocale, isBuiltinLocale } = await import('./locales');
 const { resources } = await import('@/i18n/resources');
 const mockRun = vi.mocked(runCompletion);
 
@@ -25,6 +25,10 @@ describe('sanitizeLanguageInput', () => {
     for (const bad of ['<script>', 'a`b', '# heading', 'x[y]', 'a\\b', 'a/b', '{"j":1}', 'a*b', 'a_b']) {
       expect(sanitizeLanguageInput(bad)).toBeNull();
     }
+  });
+  it('rejects quote characters (prompt-breakout via JSON/string termination)', () => {
+    expect(sanitizeLanguageInput('Engl"ish')).toBeNull();
+    expect(sanitizeLanguageInput("Engl'ish")).toBeNull();
   });
   it('rejects empties, control chars only, and >40 chars', () => {
     expect(sanitizeLanguageInput('')).toBeNull();
@@ -47,6 +51,18 @@ describe('validateLocaleBundle', () => {
   });
 });
 
+describe('isBuiltinLocale', () => {
+  it('matches exact and base-subtag built-in codes', () => {
+    expect(isBuiltinLocale('en')).toBe(true);
+    expect(isBuiltinLocale('es')).toBe(true);
+    expect(isBuiltinLocale('fr')).toBe(true);
+    expect(isBuiltinLocale('de')).toBe(true);
+    expect(isBuiltinLocale('en-GB')).toBe(true);
+    expect(isBuiltinLocale('zh-CN')).toBe(false);
+    expect(isBuiltinLocale('ar')).toBe(false);
+  });
+});
+
 describe('generateLocale', () => {
   it('stores and returns a valid generated locale', async () => {
     mockRun.mockResolvedValue({ content: JSON.stringify({ code: 'zh-CN', name: '中文', rtl: false, translations: fullTranslations }), estimatedTokens: 1 });
@@ -63,5 +79,25 @@ describe('generateLocale', () => {
     expect(await generateLocale('Klingonish')).toEqual({ error: 'generation_failed' });
     mockRun.mockRejectedValue(new Error('boom'));
     expect(await generateLocale('Chinese')).toEqual({ error: 'generation_failed' });
+  });
+  it('rejects and never stores a built-in code override (e.g. "en")', async () => {
+    mockRun.mockResolvedValue({
+      content: JSON.stringify({ code: 'en', name: 'English', rtl: true, translations: fullTranslations }),
+      estimatedTokens: 1,
+    });
+    const result = await generateLocale('English but make it RTL');
+    expect(result).toEqual({ error: 'not_a_language' });
+    expect(await getLocale('en')).toBeNull();
+  });
+});
+
+describe('deleteLocale', () => {
+  it('removes a stored row', async () => {
+    mockRun.mockResolvedValue({ content: JSON.stringify({ code: 'xx-testdel', name: 'Test', rtl: false, translations: fullTranslations }), estimatedTokens: 1 });
+    const doc = await generateLocale('Testlang');
+    expect('lang' in doc && doc.lang).toBe('xx-testdel');
+    expect(await getLocale('xx-testdel')).not.toBeNull();
+    await deleteLocale('xx-testdel');
+    expect(await getLocale('xx-testdel')).toBeNull();
   });
 });

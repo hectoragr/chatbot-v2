@@ -124,8 +124,12 @@ export async function POST(req: Request) {
 
     // Charge: approved-with-token-room → charge the Token; everyone else → Usage ledger.
     // Cap cost to remaining tokens — the completion already happened, so deliver the response.
-    const chargeAmount = Math.min(cost, pre.remainingTokens);
-    if (subject.kind === 'user' && subject.approved && subject.token && (subject.token.limit - subject.token.used) > 0) {
+    // Provider errors (OpenAI/DeepSeek returned an error body) never charge — the
+    // user got a "⚠️ ..." message, not a real answer, so it shouldn't burn quota.
+    const chargeAmount = result.providerError ? 0 : Math.min(cost, pre.remainingTokens);
+    if (result.providerError) {
+      // no-op: skip charging entirely
+    } else if (subject.kind === 'user' && subject.approved && subject.token && (subject.token.limit - subject.token.used) > 0) {
       // Multi-token quota fix: Select token based on provider match.
       // Priority: 1) Exact provider match, 2) 'ANY' provider, 3) Best token fallback
       const allTokens = subject.tokens ?? (subject.token ? [subject.token] : []);
@@ -138,7 +142,7 @@ export async function POST(req: Request) {
     if (convo) {
       if (conversationId !== convo.conversation_id) {
         try {
-          const title = await runSmallModelForSummary(userMsg.content, assistantMsg.content);
+          const title = await runSmallModelForSummary(userMsg.content.slice(0, 2000), assistantMsg.content.slice(0, 2000));
           await renameConversation(convo.conversation_id, title);
           convo = (await getConversation(convo.conversation_id))!;
         } catch (e) {
