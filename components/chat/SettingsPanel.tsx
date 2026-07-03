@@ -64,10 +64,33 @@ export function SettingsPanel({ authenticated }: { authenticated?: boolean }) {
   }, []);
 
   useEffect(() => {
-    fetch('/api/locales').then((r) => r.json()).then((d) => {
-      if (Array.isArray(d.locales)) setDynamicLocales(d.locales);
-    }).catch(() => {});
-  }, []);
+    (async () => {
+      try {
+        const r = await fetch('/api/locales');
+        const d = await r.json();
+        if (!Array.isArray(d.locales)) return;
+        setDynamicLocales(d.locales);
+
+        // Restore dynamic-locale bundle + RTL direction for a returning user
+        // whose language (persisted by i18next in localStorage) is a
+        // dynamic, non-built-in locale that isn't loaded into memory yet.
+        const current = d.locales.find((l: { lang: string; name: string; rtl: boolean }) => l.lang === i18n.language);
+        if (current) {
+          if (!i18n.hasResourceBundle(i18n.language, 'translation')) {
+            const lr = await fetch(`/api/locales/${encodeURIComponent(i18n.language)}`);
+            if (lr.ok) {
+              const { locale } = await lr.json();
+              i18n.addResourceBundle(i18n.language, 'translation', locale.translations);
+            }
+          }
+          await i18n.changeLanguage(i18n.language);
+          applyDir(current.rtl, i18n.language);
+        }
+      } catch {
+        // never break settings panel render
+      }
+    })();
+  }, [i18n]);
 
   const langOptions = [
     ...LANGS,

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import '@/i18n/config';
+import i18n from '@/i18n/config';
 import { SettingsPanel } from '@/components/chat/SettingsPanel';
 
 describe('SettingsPanel', () => {
@@ -24,5 +24,32 @@ describe('SettingsPanel', () => {
     fireEvent.mouseDown(screen.getAllByRole('button')[0]); // open language Select
     await waitFor(() => expect(screen.getByText('العربية')).toBeInTheDocument());
     expect(screen.getByText('Add language…')).toBeInTheDocument();
+  });
+
+  it('restores dynamic locale bundle and RTL direction on page load', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const u = String(url);
+      if (u === '/api/locales') {
+        return { ok: true, status: 200, json: async () => ({ locales: [{ lang: 'ar', name: 'العربية', rtl: true }] }) } as Response;
+      }
+      if (u.startsWith('/api/locales/')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ locale: { lang: 'ar', name: 'العربية', rtl: true, translations: { language: 'اللغة' } } }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({}) } as Response;
+    }));
+
+    await i18n.changeLanguage('ar');
+
+    try {
+      render(<SettingsPanel />);
+      await waitFor(() => expect(document.documentElement.dir).toBe('rtl'));
+    } finally {
+      await i18n.changeLanguage('en');
+      document.documentElement.dir = 'ltr';
+    }
   });
 });
