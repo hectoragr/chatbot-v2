@@ -41,3 +41,38 @@ export function blockSubjects(opts: { ip: string; email?: string }): string[] {
   if (opts.email) subs.push(`user:${opts.email}`);
   return subs;
 }
+
+const PATTERN_PREFIX = 'emailpat:';
+const PATTERN_CACHE_TTL_MS = 60_000;
+
+// Same-process cache only (see lib/adminDocs.ts topicsCache): in prod, admin
+// mutations run on the admin Lambda while this cache lives in the server
+// Lambda — the 60s TTL is the real staleness bound there.
+let patternCache: { at: number; items: BlockDoc[] } | null = null;
+export function invalidatePatternBlockCache(): void { patternCache = null; }
+
+/** `*` is the only wildcard; everything else is escaped. Case-insensitive. */
+export function emailPatternToRegex(glob: string): RegExp {
+  const escaped = glob.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replaceAll('\\*', '.*');
+  return new RegExp(`^${escaped}$`, 'i');
+}
+
+/**
+ * Matches an email against live `emailpat:<glob>` blocks. Cached 60s.
+ * Any error → null: pattern blocking must never take the service down.
+ */
+export async function findPatternBlock(email: string): Promise<BlockDoc | null> {
+  try {
+    if (!patternCache || Date.now() - patternCache.at >= PATTERN_CACHE_TTL_MS) {
+      const all = await listBlocks();
+      patternCache = { at: Date.now(), items: all.filter((b) => b.subject.startsWith(PATTERN_PREFIX)) };
+    }
+    for (const b of patternCache.items) {
+      if (!isLive(b)) continue;
+      if (emailPatternToRegex(b.subject.slice(PATTERN_PREFIX.length)).test(email)) return b;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
