@@ -7,7 +7,7 @@ import { incrementTokenUsed } from '@/lib/tokens';
 import { isValidModel, defaultModel, providerForModel, type Provider } from '@/lib/models';
 import { verifyCSRFTokenValue } from '@/lib/csrf';
 import { clientIp } from '@/lib/anon';
-import { findBlock, blockSubjects } from '@/lib/blocks';
+import { findBlock, findPatternBlock, blockSubjects } from '@/lib/blocks';
 import { recordHitAndMaybeBlock } from '@/lib/abuse';
 import { json, fail } from '@/lib/http';
 import type { Message } from '@/lib/ddb';
@@ -39,8 +39,9 @@ export async function POST(req: Request) {
     const subjectEmail = subject.kind === 'user' ? subject.email : undefined;
     const burstTripped = await recordHitAndMaybeBlock(ip);
     const block = await findBlock(blockSubjects({ ip, email: subjectEmail }));
-    if (burstTripped || block) {
-      return json({ error: 'blocked', reason: block?.reason ?? 'burst_auto' }, 403);
+    const patternBlock = subjectEmail ? await findPatternBlock(subjectEmail) : null;
+    if (burstTripped || block || patternBlock) {
+      return json({ error: 'blocked', reason: block?.reason ?? patternBlock?.reason ?? 'burst_auto' }, 403);
     }
 
     const pre = await getQuotaStatus(subject);
@@ -89,11 +90,17 @@ export async function POST(req: Request) {
     }
     const chosenModel = isValidModel(effectiveProvider, effectiveModel) ? effectiveModel : defaultModel(effectiveProvider);
 
-    // Anonymous users are not persisted; logged-in users get conversations.
-    const persist = !!user;
-    let convo = persist
-      ? await ensureConversation(conversationId, (subject as { token?: { token: string } }).token?.token ?? email, email, effectiveProvider)
-      : null;
+    // Everyone gets a persisted conversation. Anonymous conversations are
+    // keyed anon:<id>, carry the requester ip, and expire after 30 days (ttl).
+    const ANON_TTL_SECONDS = 30 * 24 * 3600;
+    const convoOpts = user ? undefined : { ip, ttlSeconds: ANON_TTL_SECONDS };
+    let convo = await ensureConversation(
+      conversationId,
+      (subject as { token?: { token: string } }).token?.token ?? email,
+      email,
+      effectiveProvider,
+      convoOpts,
+    );
 
     const now = new Date().toISOString();
     const promptBlocks = atts.length ? attachmentPromptBlocks(atts) : '';

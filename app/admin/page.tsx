@@ -48,7 +48,7 @@ export default function AdminPage() {
           <TokensTable items={tables.tokens ?? []} onRefresh={load} />
           <BlocksTable items={tables.blocks ?? []} onRefresh={load} />
           <AdminDocsPanel docs={tables.adminDocs ?? []} onRefresh={load} />
-          <ConversationsTable items={tables.conversations ?? []} />
+          <ConversationsTable items={tables.conversations ?? []} onRefresh={load} />
         </SpaceBetween>
       </ContentLayout>
     </div>

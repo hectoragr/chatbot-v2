@@ -37,4 +37,19 @@ describe('SignupRequestForm', () => {
     await waitFor(() => expect(calls.length).toBe(1));
     expect(JSON.parse(String(calls[0].body)).provider).toBe('ANY');
   });
+
+  it('submits the reason field', async () => {
+    const calls: RequestInit[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).includes('csrf')) return { ok: true, json: async () => ({ token: 'tok' }) } as Response;
+      if (init) calls.push(init);
+      return { ok: true, json: async () => ({}) } as Response;
+    }));
+    render(<SignupRequestForm />);
+    const reasonInput = screen.getByLabelText(/reason/i);
+    fireEvent.change(reasonInput, { target: { value: 'testing the api' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Request tokens' }));
+    await waitFor(() => expect(calls.length).toBe(1));
+    expect(JSON.parse(String(calls[0].body)).reason).toBe('testing the api');
+  });
 });

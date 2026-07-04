@@ -217,6 +217,17 @@ export class ChatbotV2Stack extends cdk.Stack {
       }),
     );
 
+    // Statement 4: SES — contact-form + token-request notification emails
+    // (lib/email.ts).
+    serverFnRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'SesSendEmail',
+        effect: iam.Effect.ALLOW,
+        actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+        resources: [`arn:aws:ses:*:${this.account}:identity/*`],
+      }),
+    );
+
     const serverFn = new lambda.Function(this, 'ServerFn', {
       functionName: 'chatbot-v2-server',
       // .open-next/server-functions/default contains index.mjs

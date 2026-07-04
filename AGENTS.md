@@ -206,6 +206,16 @@ deploy or patch the `chatbot-v2-server` Lambda env directly to apply it.
   them in the prod account via `ddb:bootstrap` before the first deploy —
   CloudFormation CREATE fails on table-already-exists. Local/CI bootstrap still
   creates them (separate accounts).
+- **SES**: the server Lambda sends email (contact form, token-request
+  notifications). It needs `ses:SendEmail` (in the stack) AND a verified SES
+  identity for the FROM address (`SES_FROM_EMAIL` or `ADMIN_EMAIL`). The
+  account is in the SES **sandbox**: only verified recipients receive mail, so
+  admin-bound emails work but requester-bound emails (approve/deny notices)
+  silently fail until SES production access is requested in the console.
+- **Conversations TTL**: anon conversations carry a `ttl` attribute (30 days).
+  The prod table has TTL enabled operationally (`aws dynamodb
+  update-time-to-live`), NOT via CDK (the table is imported). Local/CI TTL is
+  enabled by `ddb:bootstrap`.
 
 ## Environment variables
 

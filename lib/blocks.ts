@@ -23,11 +23,13 @@ export async function addBlock(subject: string, reason: string, source: 'manual'
     ...(ttlSeconds ? { ttl: Math.floor(Date.now() / 1000) + ttlSeconds } : {}),
   };
   await ddb().send(new PutCommand({ TableName: TABLES.Blocks, Item: doc }));
+  invalidatePatternBlockCache();
   return doc;
 }
 
 export async function removeBlock(subject: string): Promise<void> {
   await ddb().send(new DeleteCommand({ TableName: TABLES.Blocks, Key: { subject } }));
+  invalidatePatternBlockCache();
 }
 
 export async function listBlocks(limit = 200): Promise<BlockDoc[]> {
@@ -40,4 +42,59 @@ export function blockSubjects(opts: { ip: string; email?: string }): string[] {
   const subs = [`ip:${opts.ip}`];
   if (opts.email) subs.push(`user:${opts.email}`);
   return subs;
+}
+
+const PATTERN_PREFIX = 'emailpat:';
+const PATTERN_CACHE_TTL_MS = 60_000;
+
+// Same-process cache only (see lib/adminDocs.ts topicsCache): in prod, admin
+// mutations run on the admin Lambda while this cache lives in the server
+// Lambda — the 60s TTL is the real staleness bound there.
+let patternCache: { at: number; items: BlockDoc[] } | null = null;
+export function invalidatePatternBlockCache(): void { patternCache = null; }
+
+const MAX_GLOB_LENGTH = 200;
+const MAX_WILDCARD_COUNT = 8;
+
+/**
+ * `*` is the only wildcard; everything else is escaped. Case-insensitive.
+ *
+ * Repeated wildcards (e.g. `***`) are collapsed to a single `*` BEFORE
+ * escaping, so the compiled regex never contains adjacent `.*` groups —
+ * adjacent `.*.*` groups against a non-matching string trigger catastrophic
+ * backtracking (ReDoS). Oversized globs (>200 chars) are rejected outright
+ * as defense in depth and compile to a regex that never matches.
+ *
+ * Collapsing adjacent wildcards alone doesn't stop interleaved gobs like
+ * `*a*a*a*a@x.com`, which still compile to multiple non-adjacent `.*` groups
+ * and catastrophically backtrack against a crafted non-matching string.
+ * Bounding the total wildcard count prevents that regardless of spacing.
+ */
+export function emailPatternToRegex(glob: string): RegExp {
+  if (glob.length > MAX_GLOB_LENGTH) return /(?!)/;
+  const collapsed = glob.replace(/\*+/g, '*');
+  const wildcardCount = (collapsed.match(/\*/g) || []).length;
+  if (wildcardCount > MAX_WILDCARD_COUNT) return /(?!)/;
+  const escaped = collapsed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replaceAll('\\*', '.*');
+  return new RegExp(`^${escaped}$`, 'i');
+}
+
+/**
+ * Matches an email against live `emailpat:<glob>` blocks. Cached 60s.
+ * Any error → null: pattern blocking must never take the service down.
+ */
+export async function findPatternBlock(email: string): Promise<BlockDoc | null> {
+  try {
+    if (!patternCache || Date.now() - patternCache.at >= PATTERN_CACHE_TTL_MS) {
+      const all = await listBlocks();
+      patternCache = { at: Date.now(), items: all.filter((b) => b.subject.startsWith(PATTERN_PREFIX)) };
+    }
+    for (const b of patternCache.items) {
+      if (!isLive(b)) continue;
+      if (emailPatternToRegex(b.subject.slice(PATTERN_PREFIX.length)).test(email)) return b;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }

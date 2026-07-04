@@ -13,6 +13,7 @@ export function SignupRequestForm({ onDone }: { onDone?: () => void } = {}) {
   const { t } = useTranslation();
   const [company, setCompany] = useState('');
   const [tokenLimit, setTokenLimit] = useState('1000');
+  const [reqReason, setReqReason] = useState('');
   const [status, setStatus] = useState<'idle' | 'ok' | 'error'>('idle');
 
   const submit = async () => {
@@ -21,7 +22,7 @@ export function SignupRequestForm({ onDone }: { onDone?: () => void } = {}) {
       const r = await fetch('/api/requestToken', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-        body: JSON.stringify({ company, tokenLimit: Number(tokenLimit), provider: 'ANY' }),
+        body: JSON.stringify({ company, tokenLimit: Number(tokenLimit), provider: 'ANY', ...(reqReason.trim() ? { reason: reqReason.trim() } : {}) }),
       });
       setStatus(r.ok ? 'ok' : 'error');
     } catch {
@@ -45,6 +46,9 @@ export function SignupRequestForm({ onDone }: { onDone?: () => void } = {}) {
           {status === 'error' && <Alert type="error">{t('tokenRequestFailed')}</Alert>}
           <FormField label={t('company')}><Input value={company} onChange={({ detail }) => setCompany(detail.value)} /></FormField>
           <FormField label={t('tokensRequested')}><Input type="number" value={tokenLimit} onChange={({ detail }) => setTokenLimit(detail.value)} /></FormField>
+          <FormField label={t('requestReason')} constraintText={t('requestReasonHint')}>
+            <Input value={reqReason} onChange={({ detail }) => setReqReason(detail.value.slice(0, 100))} ariaLabel={t('requestReason')} />
+          </FormField>
         </SpaceBetween>
       </Form>
     </form>

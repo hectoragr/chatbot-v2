@@ -69,6 +69,8 @@ export type ConversationDoc = {
   provider: 'OPENAI' | 'DEEPSEEK' | 'ANY';
   messages: Message[];
   hidden?: boolean;
+  ip?: string;      // anon conversations only
+  ttl?: number;     // epoch seconds; anon conversations expire (~30 days)
 };
 
 // Optional: type for RateLimits table (handy for debugging)
@@ -89,6 +91,8 @@ export type TokenRequestDoc = {
   provider: 'OPENAI' | 'DEEPSEEK' | 'ANY';
   limit: number;
   company?: string;
+  reason?: string;
+  ip?: string;
 }
 
 export type UsageDoc = {

@@ -23,7 +23,8 @@ export type AdminOp =
   | { op: 'purgeUser'; payload: { email: string } }
   | { op: 'putAdminDoc'; payload: { doc_id?: string; title: string; topics: string; content: string } }
   | { op: 'deleteAdminDoc'; payload: { doc_id: string } }
-  | { op: 'deleteLocale'; payload: { lang: string } };
+  | { op: 'deleteLocale'; payload: { lang: string } }
+  | { op: 'deleteConversation'; payload: { conversation_id: string } };
 
 export async function runAdminOp(cmd: AdminOp): Promise<unknown> {
   switch (cmd.op) {
@@ -78,6 +79,9 @@ export async function runAdminOp(cmd: AdminOp): Promise<unknown> {
       return { deleted: true };
     case 'deleteLocale':
       await deleteLocale(cmd.payload.lang);
+      return { deleted: true };
+    case 'deleteConversation':
+      await deleteConversation(cmd.payload.conversation_id);
       return { deleted: true };
     default:
       throw new Error('UNKNOWN_ADMIN_OP');
