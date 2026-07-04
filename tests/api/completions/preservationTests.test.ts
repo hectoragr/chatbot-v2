@@ -78,6 +78,7 @@ vi.mock('@/lib/abuse', () => ({
 
 vi.mock('@/lib/blocks', () => ({
   findBlock: vi.fn(async () => null),
+  findPatternBlock: vi.fn(async () => null),
   blockSubjects: vi.fn(() => []),
 }));
 

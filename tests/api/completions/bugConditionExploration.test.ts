@@ -84,6 +84,7 @@ vi.mock('@/lib/abuse', () => ({
 // Mock blocks to always return no block
 vi.mock('@/lib/blocks', () => ({
   findBlock: vi.fn(async () => null),
+  findPatternBlock: vi.fn(async () => null),
   blockSubjects: vi.fn(() => []),
 }));
 
