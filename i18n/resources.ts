@@ -70,6 +70,8 @@ export const resources = {
       // Signup Request Form
       "company": "Company",
       "tokensRequested": "Tokens requested",
+      "requestReason": "Reason",
+      "requestReasonHint": "Why do you need tokens? (max 100 characters)",
       "provider": "Provider",
       "tokenRequestSubmitted": "Request submitted for admin approval.",
       "tokenRequestFailed": "Could not submit request. You may have reached the maximum of 3 token requests.",
@@ -185,6 +187,8 @@ export const resources = {
       // Signup Request Form
       "company": "Empresa",
       "tokensRequested": "Tokens solicitados",
+      "requestReason": "Motivo",
+      "requestReasonHint": "¿Para qué necesitas tokens? (máx. 100 caracteres)",
       "provider": "Proveedor",
       "tokenRequestSubmitted": "Solicitud enviada para aprobación del administrador.",
       "tokenRequestFailed": "No se pudo enviar la solicitud. Es posible que hayas alcanzado el máximo de 3 solicitudes de tokens.",
@@ -301,6 +305,8 @@ export const resources = {
       // Signup Request Form
       "company": "Entreprise",
       "tokensRequested": "Tokens demandés",
+      "requestReason": "Motif",
+      "requestReasonHint": "Pourquoi avez-vous besoin de jetons ? (100 caractères max)",
       "provider": "Fournisseur",
       "tokenRequestSubmitted": "Demande soumise pour approbation de l'administrateur.",
       "tokenRequestFailed": "Impossible de soumettre la demande. Vous avez peut-être atteint le maximum de 3 demandes de tokens.",
@@ -417,6 +423,8 @@ export const resources = {
       // Signup Request Form
       "company": "Unternehmen",
       "tokensRequested": "Angeforderte Tokens",
+      "requestReason": "Grund",
+      "requestReasonHint": "Wofür brauchst du Tokens? (max. 100 Zeichen)",
       "provider": "Anbieter",
       "tokenRequestSubmitted": "Anfrage zur Genehmigung durch den Administrator eingereicht.",
       "tokenRequestFailed": "Anfrage konnte nicht gesendet werden. Möglicherweise haben Sie das Maximum von 3 Token-Anfragen erreicht.",
