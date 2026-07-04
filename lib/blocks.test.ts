@@ -39,6 +39,24 @@ describe('emailPatternToRegex', () => {
     expect(regex.test(oversized)).toBe(false);
     expect(regex.test('anything@anything.com')).toBe(false);
   });
+  it('never matches and completes fast for an interleaved-wildcard glob (ReDoS regression)', () => {
+    const evil = emailPatternToRegex('*a'.repeat(20) + '@x.com');
+    const attackString = 'a'.repeat(50) + '@y.com';
+    const t0 = Date.now();
+    const result = evil.test(attackString);
+    expect(Date.now() - t0).toBeLessThan(200);
+    expect(result).toBe(false);
+  });
+  it('still matches normally at the 8-wildcard boundary', () => {
+    const regex = emailPatternToRegex('*a*b*c*d*e*f*g*@x.com');
+    expect(regex.test('1a2b3c4d5e6f7g8@x.com')).toBe(true);
+    expect(regex.test('nope@x.com')).toBe(false);
+  });
+  it('never matches once the wildcard count exceeds 8', () => {
+    const regex = emailPatternToRegex('*a*b*c*d*e*f*g*h*@x.com');
+    expect(regex.test('1a2b3c4d5e6f7g8h9@x.com')).toBe(false);
+    expect(regex.test('anything@x.com')).toBe(false);
+  });
 });
 
 describe('findPatternBlock', () => {

@@ -54,6 +54,7 @@ let patternCache: { at: number; items: BlockDoc[] } | null = null;
 export function invalidatePatternBlockCache(): void { patternCache = null; }
 
 const MAX_GLOB_LENGTH = 200;
+const MAX_WILDCARD_COUNT = 8;
 
 /**
  * `*` is the only wildcard; everything else is escaped. Case-insensitive.
@@ -63,10 +64,17 @@ const MAX_GLOB_LENGTH = 200;
  * adjacent `.*.*` groups against a non-matching string trigger catastrophic
  * backtracking (ReDoS). Oversized globs (>200 chars) are rejected outright
  * as defense in depth and compile to a regex that never matches.
+ *
+ * Collapsing adjacent wildcards alone doesn't stop interleaved gobs like
+ * `*a*a*a*a@x.com`, which still compile to multiple non-adjacent `.*` groups
+ * and catastrophically backtrack against a crafted non-matching string.
+ * Bounding the total wildcard count prevents that regardless of spacing.
  */
 export function emailPatternToRegex(glob: string): RegExp {
   if (glob.length > MAX_GLOB_LENGTH) return /(?!)/;
   const collapsed = glob.replace(/\*+/g, '*');
+  const wildcardCount = (collapsed.match(/\*/g) || []).length;
+  if (wildcardCount > MAX_WILDCARD_COUNT) return /(?!)/;
   const escaped = collapsed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replaceAll('\\*', '.*');
   return new RegExp(`^${escaped}$`, 'i');
 }
