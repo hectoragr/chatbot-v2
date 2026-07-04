@@ -60,12 +60,23 @@ export async function getLatestConversationByTokenUser(token: string, user_id?: 
 
 export async function ensureConversation(conversation_id: string | undefined, token: string, user_id: string, provider: 'OPENAI' | 'DEEPSEEK' | 'ANY' = 'ANY', opts?: { ip?: string; ttlSeconds?: number }): Promise<ConversationDoc> {
   const now = new Date().toISOString();
-  if (conversation_id && conversation_id.length > 5) {
-    const existing = await getConversation(conversation_id);
-    if (existing) return existing;
+  let idToUse = conversation_id && conversation_id.length > 5 ? conversation_id : undefined;
+  if (idToUse) {
+    const existing = await getConversation(idToUse);
+    if (existing) {
+      if (existing.user_id === user_id) return existing;
+      // Ownership mismatch: the supplied id belongs to someone else's
+      // conversation. Don't return it (would leak their history to this
+      // caller) and don't error either (a 403 would confirm the id exists,
+      // leaking that another user's conversation is there). Instead, fall
+      // through and silently start a brand-new conversation, ignoring the
+      // supplied id entirely — reusing it would collide with the existing
+      // row's PutCommand attribute_not_exists condition anyway.
+      idToUse = undefined;
+    }
   }
   const convo: ConversationDoc = {
-    conversation_id: conversation_id && conversation_id.length > 5 ? conversation_id : crypto.randomUUID(),
+    conversation_id: idToUse ?? crypto.randomUUID(),
     token, user_id, token_user: `${token}#${user_id}`,
     displayName: `${new Date().toLocaleString()}`,
     provider,
