@@ -15,6 +15,7 @@ const convo = {
   ],
   createdAt: '2026-07-01T10:00:00.000Z',
   updatedAt: '2026-07-01T10:00:05.000Z',
+  ip: '10.9.8.7',
 } as unknown as ConversationDoc;
 
 describe('ConversationsTable modal', () => {
@@ -31,5 +32,11 @@ describe('ConversationsTable modal', () => {
   it('offers an export action per row', () => {
     render(<ConversationsTable items={[convo]} />);
     expect(screen.getAllByRole('button', { name: /export/i }).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows the ip and a delete action', () => {
+    render(<ConversationsTable items={[convo]} />);
+    expect(screen.getByText('10.9.8.7')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
   });
 });

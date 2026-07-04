@@ -18,6 +18,16 @@ async function deny(token: string, onRefresh: () => void) {
   onRefresh();
 }
 
+async function blockIp(ip: string, onRefresh: () => void) {
+  const csrf = await getCsrf();
+  await fetch('/api/admin/blocks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+    body: JSON.stringify({ subject: `ip:${ip}`, reason: 'blocked from token requests' }),
+  });
+  onRefresh();
+}
+
 export function TokenRequestsTable({ items, onRefresh }: { items: TokenRequestDoc[]; onRefresh: () => void }) {
   return (
     <Table
@@ -27,6 +37,8 @@ export function TokenRequestsTable({ items, onRefresh }: { items: TokenRequestDo
         { id: 'email', header: 'Email', cell: (r) => r.user_id },
         { id: 'name', header: 'Name', cell: (r) => r.name },
         { id: 'company', header: 'Company', cell: (r) => r.company ?? '' },
+        { id: 'reason', header: 'Reason', cell: (r) => r.reason ?? '' },
+        { id: 'ip', header: 'IP', cell: (r) => r.ip ?? '' },
         { id: 'provider', header: 'Provider', cell: (r) => r.provider },
         { id: 'limit', header: 'Limit', cell: (r) => String(r.limit) },
         { id: 'requested', header: 'Requested', cell: (r) => new Date(r.createdAt).toLocaleString() },
@@ -42,6 +54,14 @@ export function TokenRequestsTable({ items, onRefresh }: { items: TokenRequestDo
               <Button variant="inline-link" onClick={() => deny(r.token, onRefresh)}>
                 Deny
               </Button>
+              {r.ip && (
+                <>
+                  {' '}
+                  <Button variant="inline-link" onClick={() => blockIp(r.ip!, onRefresh)}>
+                    Block IP
+                  </Button>
+                </>
+              )}
             </>
           ),
         },

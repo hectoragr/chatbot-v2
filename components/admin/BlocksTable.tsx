@@ -40,6 +40,7 @@ export function BlocksTable({ items, onRefresh }: { items: BlockDoc[]; onRefresh
       header={
         <Header
           counter={`(${items.length})`}
+          description="Subjects: ip:<address> · user:<email> · emailpat:<glob, * wildcard, e.g. emailpat:*@spam.com>"
           actions={
             <SpaceBetween direction="horizontal" size="xs">
               <Input
