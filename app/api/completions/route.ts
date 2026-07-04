@@ -90,11 +90,17 @@ export async function POST(req: Request) {
     }
     const chosenModel = isValidModel(effectiveProvider, effectiveModel) ? effectiveModel : defaultModel(effectiveProvider);
 
-    // Anonymous users are not persisted; logged-in users get conversations.
-    const persist = !!user;
-    let convo = persist
-      ? await ensureConversation(conversationId, (subject as { token?: { token: string } }).token?.token ?? email, email, effectiveProvider)
-      : null;
+    // Everyone gets a persisted conversation. Anonymous conversations are
+    // keyed anon:<id>, carry the requester ip, and expire after 30 days (ttl).
+    const ANON_TTL_SECONDS = 30 * 24 * 3600;
+    const convoOpts = user ? undefined : { ip, ttlSeconds: ANON_TTL_SECONDS };
+    let convo = await ensureConversation(
+      conversationId,
+      (subject as { token?: { token: string } }).token?.token ?? email,
+      email,
+      effectiveProvider,
+      convoOpts,
+    );
 
     const now = new Date().toISOString();
     const promptBlocks = atts.length ? attachmentPromptBlocks(atts) : '';

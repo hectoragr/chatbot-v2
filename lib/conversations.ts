@@ -58,7 +58,7 @@ export async function getLatestConversationByTokenUser(token: string, user_id?: 
   return conversations[0];
 }
 
-export async function ensureConversation(conversation_id: string | undefined, token: string, user_id: string, provider: 'OPENAI' | 'DEEPSEEK' | 'ANY' = 'ANY'): Promise<ConversationDoc> {
+export async function ensureConversation(conversation_id: string | undefined, token: string, user_id: string, provider: 'OPENAI' | 'DEEPSEEK' | 'ANY' = 'ANY', opts?: { ip?: string; ttlSeconds?: number }): Promise<ConversationDoc> {
   const now = new Date().toISOString();
   if (conversation_id && conversation_id.length > 5) {
     const existing = await getConversation(conversation_id);
@@ -70,6 +70,8 @@ export async function ensureConversation(conversation_id: string | undefined, to
     displayName: `${new Date().toLocaleString()}`,
     provider,
     createdAt: now, updatedAt: now, messages: [],
+    ...(opts?.ip ? { ip: opts.ip } : {}),
+    ...(opts?.ttlSeconds ? { ttl: Math.floor(Date.now() / 1000) + opts.ttlSeconds } : {}),
   };
   await ddb().send(new PutCommand({ TableName: TABLES.Conversations, Item: convo, ConditionExpression: 'attribute_not_exists(conversation_id)' }));
   return convo;
