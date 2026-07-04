@@ -89,6 +89,8 @@ export type TokenRequestDoc = {
   provider: 'OPENAI' | 'DEEPSEEK' | 'ANY';
   limit: number;
   company?: string;
+  reason?: string;
+  ip?: string;
 }
 
 export type UsageDoc = {

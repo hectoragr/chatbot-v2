@@ -76,15 +76,15 @@ export async function listTokens(email: string = '', limit: number = 100): Promi
   return (out.Items as TokenDoc[]) || [];
 }
 
-export async function createTokenRequestMaxThreeTokens(email: string, name: string, provider: 'OPENAI' | 'DEEPSEEK' | 'ANY', limit: number, company: string = ''): Promise<TokenRequestDoc> {
+export async function createTokenRequestMaxThreeTokens(email: string, name: string, provider: 'OPENAI' | 'DEEPSEEK' | 'ANY', limit: number, company: string = '', extras?: { reason?: string; ip?: string }): Promise<TokenRequestDoc> {
   const existingTokens = await listTokens(email, 10);
   if (existingTokens.length >= 3) {
     throw new Error('TOKEN_LIMIT_REACHED: A maximum of 3 active tokens are allowed per user.');
   }
-  return createTokenRequest(email, name, provider, limit, company);
+  return createTokenRequest(email, name, provider, limit, company, extras);
 }
 
-export async function createTokenRequest(email: string, name: string, provider: 'OPENAI' | 'DEEPSEEK' | 'ANY', limit: number, company: string = ''): Promise<TokenRequestDoc> {
+export async function createTokenRequest(email: string, name: string, provider: 'OPENAI' | 'DEEPSEEK' | 'ANY', limit: number, company: string = '', extras?: { reason?: string; ip?: string }): Promise<TokenRequestDoc> {
   const db = ddb();
   const now = new Date().toISOString();
   const token = generateToken(email);
@@ -98,6 +98,8 @@ export async function createTokenRequest(email: string, name: string, provider: 
     processed: false,
     createdAt: now,
     updatedAt: now,
+    ...(extras?.reason ? { reason: extras.reason } : {}),
+    ...(extras?.ip ? { ip: extras.ip } : {}),
   };
   await db.send(new PutCommand({ TableName: TABLES.TokenRequests, Item: req }));
   return req;

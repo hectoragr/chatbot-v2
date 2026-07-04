@@ -54,11 +54,12 @@ export async function notifyAdminTokenRequest(opts: {
   requesterName: string;
   provider: string;
   limit: number;
+  reason?: string;
 }) {
   await send(
     opts.adminEmail,
     `Token request from ${opts.requesterName}`,
-    `${opts.requesterName} (${opts.requesterEmail}) has requested a token.\n\nProvider: ${opts.provider}\nLimit: ${opts.limit}\n\nLog in to the admin panel to approve or deny.`,
+    `${opts.requesterName} (${opts.requesterEmail}) has requested a token.\n\nProvider: ${opts.provider}\nLimit: ${opts.limit}${opts.reason ? `\nReason: ${opts.reason}` : ''}\n\nLog in to the admin panel to approve or deny.`,
   );
 }
 
