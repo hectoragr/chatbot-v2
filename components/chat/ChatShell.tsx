@@ -38,6 +38,7 @@ export function ChatShell() {
   const [quota, setQuota] = useState<QuotaStatusDTO>(EMPTY_QUOTA);
   const [providerRemaining, setProviderRemaining] = useState<Record<string, number> | undefined>(undefined);
   const [typing, setTyping] = useState(false);
+  const [navigationOpen, setNavigationOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [contactMode, setContactMode] = useState(false);
@@ -174,6 +175,8 @@ export function ChatShell() {
         <SignupRequestForm key={String(requestOpen)} onDone={() => setRequestOpen(false)} />
       </Modal>
       <AppLayout
+        navigationOpen={navigationOpen}
+        onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
         navigationHide={!authenticated}
         navigation={
           <ConversationList
