@@ -12,6 +12,8 @@ vi.mock('@/lib/providers', () => ({ runCompletion: vi.fn(async () => ({ content:
 vi.mock('@/lib/autoModel', () => ({
   classifyMessage: vi.fn(async () => ({ model: 'gpt-4o-mini', docIds: ['career'] })),
   AUTO_FALLBACK_MODEL: 'gpt-4o-mini',
+  HISTORY_WINDOW: 5,
+  keywordPreMatch: vi.fn(() => []),
 }));
 vi.mock('@/lib/adminDocs', () => ({
   listDocTopics: vi.fn(async () => [{ doc_id: 'career', topics: 'jobs' }]),

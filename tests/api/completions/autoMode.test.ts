@@ -12,6 +12,8 @@ vi.mock('@/lib/providers', () => ({ runCompletion: vi.fn(async () => ({ content:
 vi.mock('@/lib/autoModel', () => ({
   classifyMessage: vi.fn(async () => ({ model: 'deepseek-chat', docIds: [] })),
   AUTO_FALLBACK_MODEL: 'gpt-4o-mini',
+  HISTORY_WINDOW: 5,
+  keywordPreMatch: vi.fn(() => []),
 }));
 vi.mock('@/lib/adminDocs', () => ({
   listDocTopics: vi.fn(async () => []),
@@ -44,7 +46,7 @@ describe('completions auto mode', () => {
     const body = await res.json();
     expect(body.valid).toBe(true);
     expect(body.modelUsed).toBe('deepseek-chat');
-    expect(vi.mocked(classifyMessage)).toHaveBeenCalledWith('hello', { allowedProviders: undefined, docTopics: undefined });
+    expect(vi.mocked(classifyMessage)).toHaveBeenCalledWith('hello', { allowedProviders: undefined, docTopics: undefined, history: [] });
     // Provider derived from the resolved model, not the client-sent 'AUTO'.
     expect(vi.mocked(runCompletion)).toHaveBeenCalledWith('DEEPSEEK', 'deepseek-chat', expect.any(Array), undefined, undefined);
   });
