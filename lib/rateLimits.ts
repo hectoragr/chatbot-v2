@@ -37,13 +37,16 @@ export async function loadRateLimit(key: string): Promise<RateLimitDoc> {
 }
 
 export async function updateRateLimit(key: string, increment: number, windowSec: number): Promise<number> {
-  const ttl = Math.floor(Date.now() / 1000) + windowSec;
+  const now = Math.floor(Date.now() / 1000);
+  const ttl = now + windowSec;
 
   try {
+    // First try a conditional update that only increments if TTL hasn't expired
     const result = await ddb().send(new UpdateCommand({
       TableName: TABLES.RateLimits,
       Key: { key },
-      UpdateExpression: 'ADD #count :increment SET #ttl = :ttl',
+      UpdateExpression: 'ADD #count :increment SET #ttl = if_not_exists(#ttl, :ttl)',
+      ConditionExpression: 'attribute_not_exists(#ttl) OR #ttl > :now',
       ExpressionAttributeNames: {
         '#count': 'count',
         '#ttl': 'ttl',
@@ -51,13 +54,37 @@ export async function updateRateLimit(key: string, increment: number, windowSec:
       ExpressionAttributeValues: {
         ':increment': increment,
         ':ttl': ttl,
+        ':now': now,
       },
       ReturnValues: 'ALL_NEW',
     }));
 
     return result.Attributes?.count || increment;
-  } catch (error) {
+  } catch (error: any) {
+    if (error.name === 'ConditionalCheckFailedException') {
+      // TTL expired — reset the counter
+      try {
+        const result = await ddb().send(new UpdateCommand({
+          TableName: TABLES.RateLimits,
+          Key: { key },
+          UpdateExpression: 'SET #count = :increment, #ttl = :ttl',
+          ExpressionAttributeNames: {
+            '#count': 'count',
+            '#ttl': 'ttl',
+          },
+          ExpressionAttributeValues: {
+            ':increment': increment,
+            ':ttl': ttl,
+          },
+          ReturnValues: 'ALL_NEW',
+        }));
+        return result.Attributes?.count || increment;
+      } catch (resetError) {
+        console.error('Error resetting rate limit:', resetError);
+        return increment;
+      }
+    }
     console.error('Error updating rate limit:', error);
-    return increment; // Return the increment as fallback
+    return increment;
   }
 }

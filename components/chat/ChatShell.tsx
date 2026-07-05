@@ -38,7 +38,9 @@ export function ChatShell() {
   const [quota, setQuota] = useState<QuotaStatusDTO>(EMPTY_QUOTA);
   const [providerRemaining, setProviderRemaining] = useState<Record<string, number> | undefined>(undefined);
   const [typing, setTyping] = useState(false);
-  const [navigationOpen, setNavigationOpen] = useState(false);
+  const [navigationOpen, setNavigationOpen] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth > 960 : false
+  );
   const [toolsOpen, setToolsOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [contactMode, setContactMode] = useState(false);
@@ -182,9 +184,10 @@ export function ChatShell() {
           <ConversationList
             conversations={conversations}
             activeId={activeId}
-            onSelect={selectConvo}
-            onNew={startNew}
+            onSelect={(id) => { selectConvo(id); if (window.innerWidth <= 960) setNavigationOpen(false); }}
+            onNew={() => { startNew(); if (window.innerWidth <= 960) setNavigationOpen(false); }}
             onDelete={removeConvo}
+            onClose={() => setNavigationOpen(false)}
           />
         }
         toolsOpen={toolsOpen}
