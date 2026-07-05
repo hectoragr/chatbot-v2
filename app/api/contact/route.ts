@@ -9,7 +9,7 @@ import { clientIp } from '@/lib/anon';
 import { json, fail } from '@/lib/http';
 
 const MAX_LEN = 2000;
-const DAILY_CAP = 5;
+const DAILY_CAP = 10;
 
 export async function POST(req: Request) {
   if (!verifyCSRFTokenValue(req.headers.get('x-csrf-token'))) {

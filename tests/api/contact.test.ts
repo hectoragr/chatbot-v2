@@ -62,9 +62,9 @@ describe('contact route', () => {
     expect(res.status).toBe(400);
   });
 
-  it('rate limits after 5 sends per day', async () => {
+  it('rate limits after 10 sends per day', async () => {
     sessionUser.current = { email: `limit-${Date.now()}@x.com` };
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
       expect((await POST(makeReq({ message: 'm' }))).status).toBe(200);
     }
     expect((await POST(makeReq({ message: 'm' }))).status).toBe(429);
@@ -91,8 +91,8 @@ describe('contact route', () => {
       process.env.ADMIN_EMAIL = original;
     }
     // The failed attempt above must not have consumed a daily rate-limit slot:
-    // all 5 allowed sends should still succeed now that ADMIN_EMAIL is restored.
-    for (let i = 0; i < 5; i++) {
+    // all 10 allowed sends should still succeed now that ADMIN_EMAIL is restored.
+    for (let i = 0; i < 10; i++) {
       expect((await POST(makeReq({ message: 'm' }))).status).toBe(200);
     }
     expect((await POST(makeReq({ message: 'm' }))).status).toBe(429);
