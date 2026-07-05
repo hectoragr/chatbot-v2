@@ -4,10 +4,6 @@ import type { Provider } from './models';
 
 type Tier = 'simple' | 'moderate' | 'complex';
 
-// Cheapest capable model per difficulty tier (see ALL_MODELS in lib/models.ts),
-// preference-ordered per provider: primary keeps the original approved mapping,
-// secondary is the same-tier model on the other provider. This lets the route
-// pick a candidate the user actually has token room on.
 const TIER_MODELS: Record<Tier, { provider: Provider; model: string }[]> = {
   simple:   [{ provider: 'OPENAI', model: 'gpt-4.1-nano' },   { provider: 'DEEPSEEK', model: 'deepseek-chat' }],
   moderate: [{ provider: 'DEEPSEEK', model: 'deepseek-chat' }, { provider: 'OPENAI', model: 'gpt-4o-mini' }],
@@ -15,6 +11,9 @@ const TIER_MODELS: Record<Tier, { provider: Provider; model: string }[]> = {
 };
 
 export const AUTO_FALLBACK_MODEL = 'gpt-4o-mini';
+
+/** How many recent conversation turns to include in classification context. */
+export const HISTORY_WINDOW = 5;
 
 const CLASSIFY_PROMPT =
   'Classify the difficulty of answering the following user question. ' +
@@ -26,16 +25,96 @@ const CLASSIFY_PROMPT =
 export interface ClassifyOpts {
   allowedProviders?: Provider[];
   docTopics?: { doc_id: string; topics: string }[];
+  history?: Message[];
 }
 export interface ClassifyResult { model: string; docIds: string[] }
 
-const JSON_CLASSIFY_PROMPT = (docs: { doc_id: string; topics: string }[]) =>
-  'Classify the difficulty of answering the following user question as "simple" (greetings, trivia, short factual answers), ' +
-  '"moderate" (summaries, translations, everyday coding, general explanations), or "complex" (multi-step reasoning, math ' +
-  'proofs, debugging, architecture, long analysis). Also decide which of these reference documents about the site owner, ' +
-  'if any, the question is about:\n' +
-  docs.map((d) => `- ${d.doc_id}: ${d.topics}`).join('\n') +
-  '\nReply with ONLY strict JSON: {"tier":"simple|moderate|complex","docs":["matching_doc_ids_or_empty"]}';
+// ── Stopwords: common short words in English and Spanish that should not trigger keyword matching ──
+const STOPWORDS = new Set([
+  // English
+  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'do', 'does', 'did', 'has', 'have', 'had', 'will', 'would', 'can', 'could',
+  'should', 'may', 'might', 'shall', 'must', 'it', 'its', 'this', 'that',
+  'he', 'she', 'his', 'her', 'him', 'they', 'them', 'their', 'we', 'our',
+  'you', 'your', 'my', 'me', 'who', 'what', 'when', 'where', 'how', 'why',
+  'which', 'if', 'or', 'and', 'but', 'not', 'no', 'so', 'too', 'very',
+  'just', 'about', 'also', 'than', 'then', 'some', 'any', 'all', 'each',
+  'of', 'in', 'on', 'at', 'to', 'for', 'with', 'from', 'by', 'as',
+  'into', 'like', 'does', 'get', 'got',
+  // Spanish
+  'de', 'la', 'el', 'en', 'un', 'una', 'los', 'las', 'del', 'al',
+  'es', 'son', 'fue', 'ser', 'está', 'esta', 'ese', 'esa', 'eso',
+  'que', 'por', 'para', 'con', 'como', 'más', 'mas', 'pero', 'sin',
+  'su', 'sus', 'se', 'le', 'lo', 'nos', 'ya', 'hay', 'entre',
+  'muy', 'bien', 'aquí', 'ahora', 'donde', 'cuando', 'quien',
+]);
+
+/**
+ * Normalize text for keyword matching: lowercase, strip diacritics, split on
+ * whitespace/punctuation. Returns meaningful tokens (length > 2, not stopwords).
+ */
+function normalizeTokens(text: string): string[] {
+  const stripped = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove combining diacritical marks
+    .toLowerCase();
+  const raw = stripped.split(/[\s,;.!?¿¡()\[\]{}"'`\-_/\\|:]+/);
+  return raw.filter((t) => t.length > 2 && !STOPWORDS.has(t));
+}
+
+/**
+ * Deterministic keyword pre-match: force-include docs when the message or recent
+ * history shares a meaningful token with the doc's topics field.
+ *
+ * Pure function — no I/O, no model call, cannot throw under normal conditions.
+ */
+export function keywordPreMatch(
+  message: string,
+  history: Message[],
+  docTopics: { doc_id: string; topics: string }[],
+): string[] {
+  if (docTopics.length === 0) return [];
+
+  // Build the set of meaningful tokens from message + recent history
+  const inputTokens = new Set<string>(normalizeTokens(message));
+  for (const msg of history.slice(-HISTORY_WINDOW)) {
+    for (const token of normalizeTokens(msg.content)) {
+      inputTokens.add(token);
+    }
+  }
+
+  if (inputTokens.size === 0) return [];
+
+  // Check each doc's topics for overlap
+  const matched: string[] = [];
+  for (const doc of docTopics) {
+    const topicTokens = normalizeTokens(doc.topics);
+    if (topicTokens.some((t) => inputTokens.has(t))) {
+      matched.push(doc.doc_id);
+    }
+  }
+  return matched;
+}
+
+const JSON_CLASSIFY_PROMPT = (docs: { doc_id: string; topics: string }[], history?: Message[]) => {
+  let prompt =
+    'Classify the difficulty of answering the following user question as "simple" (greetings, trivia, short factual answers), ' +
+    '"moderate" (summaries, translations, everyday coding, general explanations), or "complex" (multi-step reasoning, math ' +
+    'proofs, debugging, architecture, long analysis). Also decide which of these reference documents about the site owner, ' +
+    'if any, the question is about:\n' +
+    docs.map((d) => `- ${d.doc_id}: ${d.topics}`).join('\n') +
+    '\n\nWhen in doubt about whether a question relates to a document, include it — false positives are acceptable, false negatives are not.' +
+    '\nReply with ONLY strict JSON: {"tier":"simple|moderate|complex","docs":["matching_doc_ids_or_empty"]}';
+
+  if (history && history.length > 0) {
+    const recentTurns = history.slice(-HISTORY_WINDOW).map((m) =>
+      `${m.role}: ${m.content.slice(0, 300)}`
+    ).join('\n');
+    prompt += `\n\nRecent conversation for context (resolve pronouns like "he"/"she"/"they" using this):\n${recentTurns}`;
+  }
+
+  return prompt;
+};
 
 function pickForTier(tier: Tier, allowedProviders?: Provider[]): string {
   const candidates = TIER_MODELS[tier];
@@ -53,8 +132,12 @@ function pickForTier(tier: Tier, allowedProviders?: Provider[]): string {
  */
 export async function classifyMessage(message: string, opts?: ClassifyOpts): Promise<ClassifyResult> {
   const docTopics = opts?.docTopics ?? [];
+  const history = opts?.history ?? [];
   try {
-    const prompt = docTopics.length > 0 ? JSON_CLASSIFY_PROMPT(docTopics) : CLASSIFY_PROMPT;
+    // Deterministic keyword pre-match (runs before model call, no I/O)
+    const keywordIds = docTopics.length > 0 ? keywordPreMatch(message, history, docTopics) : [];
+
+    const prompt = docTopics.length > 0 ? JSON_CLASSIFY_PROMPT(docTopics, history) : CLASSIFY_PROMPT;
     const probe: Message = {
       role: 'user',
       content: `${prompt}\n\nQuestion:\n${message.slice(0, 2000)}`,
@@ -67,7 +150,9 @@ export async function classifyMessage(message: string, opts?: ClassifyOpts): Pro
       const parsed = JSON.parse(jsonText) as { tier?: string; docs?: unknown };
       const tier = ['simple', 'moderate', 'complex'].includes(parsed.tier ?? '') ? (parsed.tier as Tier) : undefined;
       const known = new Set(docTopics.map((d) => d.doc_id));
-      const docIds = Array.isArray(parsed.docs) ? parsed.docs.filter((d): d is string => typeof d === 'string' && known.has(d)) : [];
+      const modelDocIds = Array.isArray(parsed.docs) ? parsed.docs.filter((d): d is string => typeof d === 'string' && known.has(d)) : [];
+      // Union: keyword pre-match + model classification (deduplicated)
+      const docIds = [...new Set([...keywordIds, ...modelDocIds])];
       return { model: tier ? pickForTier(tier, opts?.allowedProviders) : AUTO_FALLBACK_MODEL, docIds };
     }
 

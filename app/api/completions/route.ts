@@ -69,16 +69,23 @@ export async function POST(req: Request) {
     }
 
     const docTopics = await listDocTopics(); // [] on error; cached 60s
+
+    // Fetch existing conversation history for classifier context (coreference resolution).
+    // This is a DynamoDB GetItem by key — fast and cheap. Only fetched when a conversationId
+    // is provided (follow-up message in an existing conversation).
+    const existingConvo = conversationId ? await getConversation(conversationId) : null;
+    const classifierHistory = (existingConvo?.messages ?? []).slice(-5);
+
     let effectiveProvider = provider as Provider;
     let effectiveModel = model;
     let docIds: string[] = [];
     if (model === 'auto') {
-      const cls = await classifyMessage(String(message), { allowedProviders, docTopics: docTopics.length ? docTopics : undefined });
+      const cls = await classifyMessage(String(message), { allowedProviders, docTopics: docTopics.length ? docTopics : undefined, history: classifierHistory });
       effectiveModel = cls.model;
       docIds = cls.docIds;
       effectiveProvider = providerForModel(effectiveModel);
     } else if (docTopics.length > 0) {
-      docIds = (await classifyMessage(String(message), { docTopics })).docIds;
+      docIds = (await classifyMessage(String(message), { docTopics, history: classifierHistory })).docIds;
     }
     if (images.length > 0) {
       // Vision forces OpenAI. For legacy provider-scoped tokens this can
