@@ -8,7 +8,9 @@ function client() {
 }
 
 const isLocal = process.env.LOCAL_DDB === 'true';
-const FROM = process.env.SES_FROM_EMAIL || process.env.ADMIN_EMAIL || 'noreply@localhost';
+const FROM_PROD = process.env.SES_FROM_EMAIL || process.env.ADMIN_EMAIL || '';
+const FROM_LOCAL = process.env.SES_FROM_EMAIL || process.env.ADMIN_EMAIL || 'noreply@localhost';
+const FROM = isLocal ? FROM_LOCAL : FROM_PROD;
 const SMTP_HOST = process.env.SMTP_HOST || 'localhost';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '1025', 10);
 
@@ -31,7 +33,7 @@ async function send(to: string, subject: string, body: string): Promise<boolean>
     }
     return true;
   }
-  if (!FROM) { console.warn('[email] SES_FROM_EMAIL not set, skipping send'); return false; }
+  if (!FROM) { console.warn('[email] No verified FROM address configured, skipping send'); return false; }
   try {
     await client().send(new SendEmailCommand({
       Source: FROM,
