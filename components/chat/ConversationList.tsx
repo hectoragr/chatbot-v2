@@ -11,12 +11,18 @@ interface Props {
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete?: (id: string) => void;
+  onClose?: () => void;
 }
 
-export function ConversationList({ conversations, activeId, onSelect, onNew, onDelete }: Props) {
+export function ConversationList({ conversations, activeId, onSelect, onNew, onDelete, onClose }: Props) {
   const { t } = useTranslation();
   return (
     <SpaceBetween size="xs" direction="vertical">
+      {onClose && (
+        <Box padding={{ horizontal: 'm', vertical: 'xs' }} float="right">
+          <Button variant="icon" iconName="close" ariaLabel="Close panel" onClick={onClose} />
+        </Box>
+      )}
       <Box padding={{ horizontal: 'm', vertical: 's' }}>
         <Button variant="primary" fullWidth onClick={onNew} iconName="add-plus">
           {t('newConversation')}
