@@ -111,7 +111,7 @@ vi.mock('@/lib/conversations', () => ({
 const { POST } = await import('@/app/api/completions/route');
 const { generateCSRFToken } = await import('@/lib/csrf');
 const { incrementTokenUsed } = await import('@/lib/tokens');
-const { consumeQuota, getQuotaStatus } = await import('@/lib/quota');
+const { getQuotaStatus } = await import('@/lib/quota');
 const subjectModule = await import('@/lib/subject');
 const resolveSubject = subjectModule.resolveSubject;
 

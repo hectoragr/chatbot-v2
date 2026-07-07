@@ -22,9 +22,9 @@ jobs:
         ports:
           - 8000:8000
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -46,8 +46,20 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm test
+      - name: Test (with coverage floors)
+        run: npm run test:coverage
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E smoke (Playwright)
+        # Keyless: with no provider API keys, completions fall back to a
+        # mocked response (lib/providers.ts), so the smoke test costs nothing.
+        run: npm run test:e2e
+        env:
+          LOCAL_DDB: 'true'
+          DDB_ENDPOINT: http://localhost:8000
+          AWS_REGION: us-east-1
 
   deploy:
     name: Deploy to AWS
@@ -55,9 +67,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -71,7 +83,7 @@ jobs:
           APP_BASE_URL: https://chat.hectoragomez.com
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1

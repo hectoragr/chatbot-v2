@@ -60,8 +60,8 @@ export async function updateRateLimit(key: string, increment: number, windowSec:
     }));
 
     return result.Attributes?.count || increment;
-  } catch (error: any) {
-    if (error.name === 'ConditionalCheckFailedException') {
+  } catch (error) {
+    if (error instanceof Error && error.name === 'ConditionalCheckFailedException') {
       // TTL expired — reset the counter to start a new window
       try {
         const result = await ddb().send(new UpdateCommand({

@@ -4,6 +4,9 @@ Guidance for AI coding agents working in this repo. Human-readable too.
 `CLAUDE.md` is a symlink to this file — edit `AGENTS.md`, never create a
 separate `CLAUDE.md`.
 
+This file extends the global baseline at `~/Workspace/AGENTS.md` (request
+modes, mock-first UI, testing and git/PR rules). On conflict, this file wins.
+
 > **For multi-agent / multi-model runners:** this file is the contract. Read
 > "Engineering standards" before writing code and "Definition of done" before
 > claiming a task complete. Every rule here is enforced by review; violating
@@ -52,8 +55,12 @@ If tests fail with a DynamoDB connection error, local DDB isn't running:
 | `npm run typecheck` | `tsc --noEmit` — run before every commit |
 | `npm run lint` | ESLint (next) |
 | `npm test` | Vitest unit + component tests |
-| `npm run test:e2e` | Playwright |
+| `npm run test:coverage` | Vitest with coverage — floors enforced (see Testing) |
+| `npm run test:e2e` | Playwright (also runs in CI, keyless) |
 | `npm run build:opennext` | OpenNext bundle for AWS |
+| `npm run ddb:start` / `ddb:bootstrap` | Local DynamoDB up / create tables + GSIs + TTL |
+| `npm run mail:start` | Mailpit local SMTP (UI at http://localhost:8025) |
+| `npm run services:start` | All local Docker services (DDB + Mailpit) |
 
 **Before any commit: `npm run typecheck && npm test` (and `npm run lint`).**
 CI runs lint, typecheck, and test as a gate before deploy
@@ -284,6 +291,20 @@ import, update the `vi.mock(...)` of that lib in every route test that mocks it,
 or those tests 500. Playwright e2e in `tests/e2e/`. Always run `npm test` before
 committing.
 
+**Coverage** (`npm run test:coverage`, v8): CI enforces floors set in
+`vitest.config.ts` (currently lines 51 / branches 50 / functions 48) — a PR
+that drops below them fails. The target is **≥85% lines**; the floors are a
+ratchet: when your PR raises coverage, raise the floors to match. Floors only
+go up — with one exception: a vitest major bump changes how the metrics are
+counted (v3→v4 re-based branches from ~78% to ~52% with identical tests), so
+re-measure and recalibrate the floors as part of any provider upgrade.
+Biggest gaps to close first: `lib/tokens.ts`, `lib/providers.ts`,
+`lib/conversations.ts`, `lib/users.ts`, `lib/email.ts`.
+
+**E2E** runs in CI on every PR — keyless: with no provider API keys,
+completions fall back to a mocked response, so specs assert flow, not model
+output. Add a spec to `tests/e2e/` when you add a user-visible flow.
+
 ## Definition of done
 
 A task is complete only when ALL hold:
@@ -294,6 +315,25 @@ A task is complete only when ALL hold:
 4. The Engineering standards above are met (perf, DRY, a11y, security).
 5. No secrets, table names, or magic values hardcoded that belong in
    `lib/ddb.ts` `TABLES`, env, or a shared constant.
+6. Coverage floors pass (`npm run test:coverage`); if the PR raised coverage,
+   the floors in `vitest.config.ts` were raised to match.
+7. Improvement pass done: assumptions/gotchas discovered this session are
+   written back into this file in the same PR (or the PR states none were found).
+
+## Git & PR workflow
+
+- **Never commit to `main`** — merge to `main` auto-deploys production. Branch
+  per change: `feat/…`, `fix/…`, `chore/…`, `docs/…`.
+- **Pull before every push — first push and every revision alike:**
+  `git pull --rebase origin main`, resolve, re-run typecheck + tests, then
+  push. Force-push only with `--force-with-lease`, only right after that
+  rebase. (A local checkout of this repo once drifted 63 commits behind and
+  nearly produced doc edits against an obsolete file — always start from a
+  fresh pull.)
+- Every change lands via PR: what & why, test evidence, screenshots or the
+  HTML mock for UI changes, assumptions made. Fill the PR template checklist —
+  it mirrors Definition of done.
+- CI (lint, typecheck, tests + coverage floors, e2e smoke) green before merge.
 
 ## Deploy
 
@@ -379,10 +419,27 @@ Local dev: see `.env.example` — `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, the
 `LOCAL_DDB`/`DDB_ENDPOINT`. In prod these come from SSM (above); `ADMIN_FN_NAME`
 is set by infra.
 
-## Workflow for non-trivial changes
+## Workflow
 
-Established across three shipped batches: brainstorm → design spec
-(`docs/superpowers/specs/`) → implementation plan (`docs/superpowers/plans/`) →
-build task-by-task with a fresh review after each → browser/AWS smoke test →
-whole-branch review → PR to `main` (auto-deploys). Keep specs and plans in the
-repo; they are the audit trail.
+**Full ceremony required** when a change adds a user-facing surface, touches
+quota/auth/billing/blocks, or spans more than ~2 non-test files:
+brainstorm → design spec (`docs/superpowers/specs/`) → implementation plan
+(`docs/superpowers/plans/`) → build task-by-task with a fresh review after
+each → browser/AWS smoke test → whole-branch review → PR to `main`
+(auto-deploys). Keep specs and plans in the repo; they are the audit trail.
+Established across three shipped batches.
+
+**Anything smaller** (bugfix, copy, config): branch → failing test → fix → PR.
+
+**New UI feature? Mock first.** Before implementing, produce standalone HTML
+mock(s) showing all states (empty / loading / error / populated), light/dark,
+and mobile — presented side by side (variants when direction is open,
+current-vs-proposed when changing a screen). Iterate until approved, then
+build it in Cloudscape; the mock is the contract for layout and states, never
+code to paste. Attach it to the PR.
+
+**Every PR: improvement pass.** List the assumptions made during the session;
+write anything that generalizes (new gotcha, corrected command, refined
+convention) back into this file in the same PR. Run judgment work — planning,
+review, this pass — on the most capable reasoning model available in the
+executing environment.

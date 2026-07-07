@@ -123,9 +123,10 @@ export async function runSmallModelForSummary(userMessage: string, assistantMess
       const title = data.choices[0].message.content.trim();
       return title.length > 100 ? title.slice(0, 100) : title;
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error generating summary title:', error);
-    console.error('Error details:', error.response?.data || error.message);
+    const err = error as { response?: { data?: unknown }; message?: string };
+    console.error('Error details:', err.response?.data || err.message);
   }
   return `Chat from ${new Date().toLocaleTimeString()}`;
 };
