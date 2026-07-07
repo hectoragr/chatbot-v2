@@ -46,8 +46,20 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm test
+      - name: Test (with coverage floors)
+        run: npm run test:coverage
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E smoke (Playwright)
+        # Keyless: with no provider API keys, completions fall back to a
+        # mocked response (lib/providers.ts), so the smoke test costs nothing.
+        run: npm run test:e2e
+        env:
+          LOCAL_DDB: 'true'
+          DDB_ENDPOINT: http://localhost:8000
+          AWS_REGION: us-east-1
 
   deploy:
     name: Deploy to AWS
