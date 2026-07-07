@@ -24,7 +24,6 @@ vi.mock('@/lib/tokens', () => ({ incrementTokenUsed: vi.fn(async () => {}) }));
 const { POST } = await import('@/app/api/completions/route');
 const { runCompletion } = await import('@/lib/providers');
 const { classifyMessage } = await import('@/lib/autoModel');
-const { incrementTokenUsed } = await import('@/lib/tokens');
 const { generateCSRFToken } = await import('@/lib/csrf');
 
 const anonId = `c-${globalThis.crypto.randomUUID()}`;

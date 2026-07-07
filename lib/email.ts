@@ -21,7 +21,7 @@ async function send(to: string, subject: string, body: string): Promise<boolean>
       const transport = createTransport({ host: SMTP_HOST, port: SMTP_PORT, secure: false });
       await transport.sendMail({ from: FROM, to, subject, text: body });
       console.log(`📧 [email:dev] Sent to ${to} → view at http://localhost:8025`);
-    } catch (e) {
+    } catch {
       // Fallback to console if Mailpit isn't running — still a successful "send"
       // from the caller's perspective (dev-only path, nothing to retry).
       console.log('\n📧 [email:dev] ─────────────────────────────');

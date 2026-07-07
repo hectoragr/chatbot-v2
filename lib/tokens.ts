@@ -220,7 +220,7 @@ export async function updateToken(tokenStr: string, updates: Partial<Omit<TokenD
   const db = ddb();
   const updateExpr: string[] = [];
   const exprAttrNames: Record<string, string> = {};
-  const exprAttrValues: Record<string, any> = {};
+  const exprAttrValues: Record<string, string | number | boolean> = {};
   if (updates.provider) {
     updateExpr.push('provider = :prov');
     exprAttrValues[':prov'] = updates.provider;

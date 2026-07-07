@@ -1,4 +1,4 @@
-import { DynamoDBClient, CreateTableCommand, DeleteTableCommand, ListTablesCommand, UpdateTableCommand, UpdateTimeToLiveCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, CreateTableCommand, DeleteTableCommand, ListTablesCommand, UpdateTimeToLiveCommand } from "@aws-sdk/client-dynamodb";
 
 const REGION = process.env.AWS_REGION || "us-west-2";
 const ENDPOINT = process.env.DDB_ENDPOINT; // used when LOCAL_DDB=true

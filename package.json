@@ -5,11 +5,14 @@
   "engines": {
     "node": "22.x"
   },
+  "overrides": {
+    "postcss": "^8.5.10"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -54,12 +57,12 @@
     "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "@vitest/coverage-v8": "^2.1.9",
-    "eslint": "^10.5.0",
+    "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.9",
     "jsdom": "^25.0.1",
     "typescript": "^5.6.2",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.10"
   }
 }

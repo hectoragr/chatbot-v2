@@ -19,14 +19,16 @@ export default defineConfig({
       ],
       exclude: ['**/*.test.ts', '**/*.test.tsx', '**/*.d.ts'],
       reporter: ['text-summary', 'text'],
-      // Ratchet floors: set just under measured coverage (2026-07). Target is
-      // ≥85% lines — when a PR raises coverage, raise these to match. Floors
-      // only go up. See AGENTS.md "Testing".
+      // Ratchet floors: set just under measured coverage (2026-07, vitest 4).
+      // Target is ≥85% lines — when a PR raises coverage, raise these to
+      // match. Floors only go up. NOTE: a vitest major bump changes how these
+      // metrics are counted (v4 remaps AST-aware) — re-measure and
+      // recalibrate on provider upgrades. See AGENTS.md "Testing".
       thresholds: {
-        lines: 55,
-        statements: 55,
-        functions: 52,
-        branches: 75,
+        lines: 51,
+        statements: 50,
+        functions: 48,
+        branches: 50,
       },
     },
   },
