@@ -10,19 +10,38 @@ are deleted, not flag-gated.
 > live chatbot down — every completion returns `AccessDeniedException`. The merge
 > is gated on Step 0 below being done.
 
-## Tiers
+## Tiers (as implemented)
 
-| Tier | Models | Daily limit | Vision | Auth |
+| Tier | Models (Bedrock inference-profile IDs) | Daily limit | Vision | Auth |
 |---|---|---|---|---|
-| **anon** | Nova Lite, Claude Haiku 4.5 | 3 prompts / 1000 tokens (IP+cookie) | no | captcha |
-| **unapproved** (signed-in) | Nova Lite, Nova Pro, Haiku 4.5 | **1000 tokens/day** | no | Auth0 |
-| **approved** | + Claude Sonnet 4.5, Llama 3.3 70B, Mistral Large 2 | admin token grant, then daily fallback | yes | Auth0 + approval |
+| **anon** | Nova Micro, Nova Lite | 3 prompts / 1000 tokens (IP+cookie) | Nova Lite only | captcha |
+| **unapproved** (signed-in) | + Nova Pro, Claude Haiku 4.5 | **1000 tokens/day** | no | Auth0 |
+| **approved** | + Claude Sonnet 4.5, Llama 3.3 70B, Pixtral Large | admin token grant, then daily fallback | yes | Auth0 + approval |
+
+Confirmed IDs (from `aws bedrock list-inference-profiles`, us-east-1):
+`us.amazon.nova-micro-v1:0`, `us.amazon.nova-lite-v1:0`, `us.amazon.nova-pro-v1:0`,
+`us.anthropic.claude-haiku-4-5-20251001-v1:0`, `us.anthropic.claude-sonnet-4-5-20250929-v1:0`,
+`us.meta.llama3-3-70b-instruct-v1:0`, `us.mistral.pixtral-large-2502-v1:0`.
+(Mistral Large 2/3 is NOT in the account's profile list — Pixtral Large is the
+Mistral flagship available, and it is vision-capable, so it takes the approved slot.)
 
 The tier gate lives at the existing quota chokepoint in
 `app/api/completions/route.ts`: resolve tier → intersect the requested model with
 that tier's allowlist → fall back to the tier's default model if not allowed. The
 auto-router (`lib/autoModel.ts`) only picks from the caller's allowed set, so anon
 "auto" can never route to Sonnet.
+
+## Implementation status — COMPLETE (on branch, pre-merge)
+
+- ✅ `lib/models.ts` — Bedrock-only registry, tier allowlists, vision flags
+- ✅ `lib/providers.ts` — rewritten to the Bedrock Converse API (`@aws-sdk/client-bedrock-runtime`), images as Converse image blocks, real token usage from the API
+- ✅ `lib/autoModel.ts` — Bedrock tier preferences, allowed-model routing, classifier on the cheapest model
+- ✅ `app/api/completions/route.ts` — tier-gated model resolution, vision→tier vision model, provider-agnostic charging
+- ✅ `lib/conversations.ts` / `lib/locales.ts` — title + locale generation moved to Bedrock (were OpenAI/DeepSeek)
+- ✅ `app/api/requestToken/route.ts` — token grants are always `ANY` (no provider dimension)
+- ✅ `infra/lib/chatbot-v2-stack.ts` — `bedrock:InvokeModel` IAM on the server role; OpenAI/DeepSeek SSM env removed
+- ✅ Tests — 48 files / 200 tests green; dead per-provider-token tests removed, charging-semantics tests rewritten
+- ✅ `npm run typecheck`, `eslint` (migration source), and `npm run build` all pass locally
 
 ## Step 0 — AWS access (model-access page RETIRED; IAM is the gate now)
 
