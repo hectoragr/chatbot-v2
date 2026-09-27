@@ -33,7 +33,7 @@ function makeReq(body: Record<string, unknown>, headers: Record<string, string> 
   return new Request('http://x/api/completions', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-csrf-token': token, ...headers },
-    body: JSON.stringify({ message: 'hello', provider: 'OPENAI', model: 'gpt-4o-mini', ...body }),
+    body: JSON.stringify({ message: 'hello', provider: 'BEDROCK', model: 'us.amazon.nova-lite-v1:0', ...body }),
   });
 }
 

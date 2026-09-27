@@ -70,7 +70,7 @@ function makeReq() {
   return new Request('http://x/api/completions', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-csrf-token': token, 'x-forwarded-for': ip, cookie: `anon_id=c-${globalThis.crypto.randomUUID()}` },
-    body: JSON.stringify({ message: 'hello', provider: 'OPENAI', model: 'gpt-4o-mini' }),
+    body: JSON.stringify({ message: 'hello', provider: 'BEDROCK', model: 'us.amazon.nova-lite-v1:0' }),
   });
 }
 
