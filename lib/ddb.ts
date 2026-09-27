@@ -29,7 +29,7 @@ export const TABLES = {
 export type TokenDoc = {
   token: string;
   user_id: string;
-  provider: 'OPENAI' | 'DEEPSEEK' | 'ANY';
+  provider: 'OPENAI' | 'DEEPSEEK' | 'ANY' | 'BEDROCK';
   model?: string;
   limit: number;
   used: number;
@@ -66,7 +66,7 @@ export type ConversationDoc = {
   token_user: string; // `${token}#${user_id}`
   createdAt: string;
   updatedAt: string;
-  provider: 'OPENAI' | 'DEEPSEEK' | 'ANY';
+  provider: 'OPENAI' | 'DEEPSEEK' | 'ANY' | 'BEDROCK';
   messages: Message[];
   hidden?: boolean;
   ip?: string;      // anon conversations only
@@ -88,7 +88,7 @@ export type TokenRequestDoc = {
   denied?: boolean;
   createdAt: string;
   updatedAt: string;
-  provider: 'OPENAI' | 'DEEPSEEK' | 'ANY';
+  provider: 'OPENAI' | 'DEEPSEEK' | 'ANY' | 'BEDROCK';
   limit: number;
   company?: string;
   reason?: string;

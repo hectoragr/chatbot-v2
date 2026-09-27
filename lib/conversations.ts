@@ -1,6 +1,8 @@
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand, BatchWriteCommand, ScanCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 
 import { ddb, TABLES } from './ddb.js';
+import { runCompletion } from './providers.js';
+import { FALLBACK_MODEL } from './models.js';
 
 import type { ConversationDoc, Message } from './ddb.js';
 
@@ -58,7 +60,7 @@ export async function getLatestConversationByTokenUser(token: string, user_id?: 
   return conversations[0];
 }
 
-export async function ensureConversation(conversation_id: string | undefined, token: string, user_id: string, provider: 'OPENAI' | 'DEEPSEEK' | 'ANY' = 'ANY', opts?: { ip?: string; ttlSeconds?: number }): Promise<ConversationDoc> {
+export async function ensureConversation(conversation_id: string | undefined, token: string, user_id: string, provider: 'OPENAI' | 'DEEPSEEK' | 'ANY' | 'BEDROCK' = 'BEDROCK', opts?: { ip?: string; ttlSeconds?: number }): Promise<ConversationDoc> {
   const now = new Date().toISOString();
   let idToUse = conversation_id && conversation_id.length > 5 ? conversation_id : undefined;
   if (idToUse) {
@@ -89,44 +91,22 @@ export async function ensureConversation(conversation_id: string | undefined, to
 }
 
 export async function runSmallModelForSummary(userMessage: string, assistantMessage: string): Promise<string> {
-  if (!process.env.DEEPSEEK_API_KEY) return `Chat on ${new Date().toLocaleString()}`;
   try {
-    const messages = [
-      {
-        role: 'system',
-        content: 'You are a helpful assistant that creates concise chat titles. Respond with ONLY the title, no explanations or extra text.',
-      },
-      {
-        role: 'user',
-        content: `Create a concise title (2-6 words) for this chat:\nUser: ${userMessage}\nAssistant: ${assistantMessage}`,
-      },
-    ];
-
-    const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages,
-        max_tokens: 20,
-        temperature: 0.3,
-        top_p: 0.95,
-      }),
-    });
-
-    const data = await r.json();
-
-    if (data?.choices?.[0]?.message?.content) {
-      const title = data.choices[0].message.content.trim();
+    const probe: Message = {
+      role: 'user',
+      content:
+        'Create a concise chat title (2-6 words) for this exchange. Respond with ONLY the title, ' +
+        `no explanations, no quotes.\nUser: ${userMessage}\nAssistant: ${assistantMessage}`,
+      createdAt: new Date().toISOString(),
+    };
+    // Cheapest Bedrock model, billed via IAM. runCompletion never throws.
+    const { content } = await runCompletion(FALLBACK_MODEL, [probe]);
+    const title = (content || '').trim().replace(/^["']|["']$/g, '');
+    if (title && title !== '[mocked completion]') {
       return title.length > 100 ? title.slice(0, 100) : title;
     }
   } catch (error) {
     console.error('Error generating summary title:', error);
-    const err = error as { response?: { data?: unknown }; message?: string };
-    console.error('Error details:', err.response?.data || err.message);
   }
   return `Chat from ${new Date().toLocaleTimeString()}`;
 };
