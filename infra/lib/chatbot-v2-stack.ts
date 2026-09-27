@@ -56,9 +56,9 @@ const TABLE_NAMES = [
 //   aws ssm put-parameter --name /chatbot-v2/prod/AUTH0_CLIENT_ID      --value "..." --type String
 //   aws ssm put-parameter --name /chatbot-v2/prod/AUTH0_CLIENT_SECRET  --value "..." --type SecureString
 //   aws ssm put-parameter --name /chatbot-v2/prod/AUTH0_DOMAIN         --value "your-tenant.us.auth0.com" --type String
-//   aws ssm put-parameter --name /chatbot-v2/prod/OPENAI_API_KEY       --value "sk-..." --type SecureString
-//   aws ssm put-parameter --name /chatbot-v2/prod/DEEPSEEK_API_KEY     --value "sk-..." --type SecureString
 //   aws ssm put-parameter --name /chatbot-v2/prod/ADMIN_EMAIL          --value "..." --type String
+// Bedrock needs NO SSM secret — it is IAM-billed (see the ServerFnRole
+// BedrockInvokeInferenceProfiles statement below).
 const SSM_PREFIX = '/chatbot-v2/prod';
 
 export interface ChatbotV2StackProps extends cdk.StackProps {
@@ -207,6 +207,27 @@ export class ChatbotV2Stack extends cdk.Stack {
     localesTable.grantReadWriteData(serverFnRole);
     adminDocsTable.grantReadData(serverFnRole);
 
+    // Bedrock: the server Lambda invokes foundation models via the `us.`
+    // cross-region inference profiles (Converse / InvokeModel). A profile call
+    // requires invoke permission on BOTH the inference-profile ARN AND the
+    // underlying foundation-model ARNs in every region the profile can route to
+    // (us-east-1 / us-east-2 / us-west-2). Scoped to this account's profiles and
+    // to the foundation models (foundation-model ARNs are account-agnostic, so
+    // the resource uses '*' for the account segment). This IAM grant is now the
+    // ONLY thing that authorizes model invocation — AWS retired the per-model
+    // "Model access" console page; serverless models auto-enable on first call.
+    serverFnRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'BedrockInvokeInferenceProfiles',
+        effect: iam.Effect.ALLOW,
+        actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+        resources: [
+          `arn:aws:bedrock:*:${this.account}:inference-profile/*`,
+          'arn:aws:bedrock:*::foundation-model/*',
+        ],
+      }),
+    );
+
     // Statement 3: InvokeFunction ONLY on admin-fn
     serverFnRole.addToPolicy(
       new iam.PolicyStatement({
@@ -273,8 +294,9 @@ export class ChatbotV2Stack extends cdk.Stack {
         AUTH0_DOMAIN: ssmParam('AUTH0_DOMAIN'),
         AUTH0_SCOPE: 'openid profile email',
         APP_BASE_URL: domainName ? `https://${domainName}` : '',
-        OPENAI_API_KEY: ssmParam('OPENAI_API_KEY'),
-        DEEPSEEK_API_KEY: ssmParam('DEEPSEEK_API_KEY'),
+        // Bedrock is IAM-billed — no API keys. Region defaults to the stack
+        // region (us-east-1) in lib/providers.ts; override only to split
+        // Bedrock into another region (not recommended — adds a cross-region hop).
         ADMIN_EMAIL: ssmParam('ADMIN_EMAIL'),
 
         // ── Abuse / quota / kill-switch tuning knobs (lib/limitsConfig.ts) ─────

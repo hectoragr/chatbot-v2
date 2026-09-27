@@ -1,6 +1,7 @@
 import { GetCommand, PutCommand, ScanCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLES, type LocaleDoc } from './ddb';
 import { runCompletion } from './providers';
+import { FALLBACK_MODEL } from './models';
 import { resources } from '@/i18n/resources';
 
 const CODE_RE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/;
@@ -81,7 +82,7 @@ export async function generateLocale(language: string): Promise<LocaleDoc | { er
     '(keep {{placeholders}} untouched, keep them meaningful for a chat UI):\n' +
     JSON.stringify(en);
   try {
-    const { content } = await runCompletion('OPENAI', 'gpt-4o-mini', [
+    const { content } = await runCompletion(FALLBACK_MODEL, [
       { role: 'user', content: prompt, createdAt: new Date().toISOString() },
     ]);
     const jsonText = content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');

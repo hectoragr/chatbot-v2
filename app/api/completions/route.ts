@@ -4,7 +4,7 @@ import { getQuotaStatus, consumeQuota } from '@/lib/quota';
 import { ensureConversation, getConversation, appendMessages, renameConversation, runSmallModelForSummary } from '@/lib/conversations';
 import { runCompletion } from '@/lib/providers';
 import { incrementTokenUsed } from '@/lib/tokens';
-import { isValidModel, defaultModel, providerForModel, type Provider } from '@/lib/models';
+import { isValidModel, isModelAllowedForTier, defaultModelForTier, visionModelForTier, TIER_MODELS, type Tier } from '@/lib/models';
 import { verifyCSRFTokenValue } from '@/lib/csrf';
 import { clientIp } from '@/lib/anon';
 import { findBlock, findPatternBlock, blockSubjects } from '@/lib/blocks';
@@ -14,10 +14,9 @@ import { checkGlobalKillSwitch, recordGlobalSpend } from '@/lib/killSwitch';
 import { anonCaptchaRequired } from '@/lib/limitsConfig';
 import { json, fail } from '@/lib/http';
 import type { Message } from '@/lib/ddb';
-import { selectTokenForProvider } from './selectTokenForProvider';
 import { classifyMessage } from '@/lib/autoModel';
 import { listDocTopics, getDocsForInjection } from '@/lib/adminDocs';
-import { validateAttachments, attachmentPromptBlocks, attachmentStoredBlocks, imageUrls, isVisionModel, ATTACHMENT_GUARD, IMAGE_TOKEN_COST, VISION_FALLBACK_MODEL } from '@/lib/attachments';
+import { validateAttachments, attachmentPromptBlocks, attachmentStoredBlocks, imageUrls, isVisionModel, ATTACHMENT_GUARD, IMAGE_TOKEN_COST } from '@/lib/attachments';
 
 export async function POST(req: Request) {
   if (!verifyCSRFTokenValue(req.headers.get('x-csrf-token'))) {
@@ -27,7 +26,7 @@ export async function POST(req: Request) {
     const { message, conversationId, provider, model, attachments, captchaId, captchaAnswer } = await req.json();
     if (!message || !provider) return json({ error: 'message and provider required' }, 400);
     if (model !== undefined && typeof model !== 'string') return json({ error: 'invalid model' }, 400);
-    if (provider !== 'AUTO' && provider !== 'OPENAI' && provider !== 'DEEPSEEK') return json({ error: 'invalid provider' }, 400);
+    if (provider !== 'AUTO' && provider !== 'BEDROCK') return json({ error: 'invalid provider' }, 400);
     if (provider === 'AUTO' && model !== 'auto') return json({ error: 'invalid model for AUTO provider' }, 400);
 
     const attVal = validateAttachments(attachments);
@@ -73,21 +72,11 @@ export async function POST(req: Request) {
     const user = await getSessionUser();
     const email = user?.email ?? `anon:${subject.kind === 'anon' ? subject.anonId : 'x'}`;
 
-    // Auto mode: classify AFTER the quota/abuse gates so blocked users never
-    // trigger classifier spend. The client-sent provider is ignored.
-    let allowedProviders: Provider[] | undefined;
-    if (subject.kind === 'user' && subject.approved && subject.token && (subject.token.limit - subject.token.used) > 0) {
-      // Provider-aware: an approved user with token room can only be billed on
-      // the provider(s) their tokens cover. 'ANY' covers both. Users billed via
-      // the Usage ledger (anon/unapproved/token-exhausted) are provider-agnostic.
-      const tokensWithRoom = (subject.tokens ?? []).filter((t) => t.isActive && (t.limit - t.used) > 0);
-      const providers = new Set(tokensWithRoom.map((t) => t.provider));
-      if (providers.has('ANY')) {
-        allowedProviders = ['OPENAI', 'DEEPSEEK'];
-      } else {
-        allowedProviders = [...providers] as Provider[];
-      }
-    }
+    // Tier gate: the caller's quota tier decides which Bedrock models they may
+    // invoke (models.ts TIER_MODELS). Everything bills via IAM now, so there is
+    // no provider dimension — just an allowlist per tier.
+    const tier: Tier = pre.tier;
+    const allowedModels = TIER_MODELS[tier];
 
     const docTopics = await listDocTopics(); // [] on error; cached 60s
 
@@ -97,26 +86,31 @@ export async function POST(req: Request) {
     const existingConvo = conversationId ? await getConversation(conversationId) : null;
     const classifierHistory = (existingConvo?.messages ?? []).slice(-5);
 
-    let effectiveProvider = provider as Provider;
     let effectiveModel = model;
     let docIds: string[] = [];
     if (model === 'auto') {
-      const cls = await classifyMessage(String(message), { allowedProviders, docTopics: docTopics.length ? docTopics : undefined, history: classifierHistory });
+      // Auto routing picks ONLY from the caller's tier allowlist, so anon "auto"
+      // can never route to a flagship model.
+      const cls = await classifyMessage(String(message), { allowedModels, docTopics: docTopics.length ? docTopics : undefined, history: classifierHistory });
       effectiveModel = cls.model;
       docIds = cls.docIds;
-      effectiveProvider = providerForModel(effectiveModel);
     } else if (docTopics.length > 0) {
       docIds = (await classifyMessage(String(message), { docTopics, history: classifierHistory })).docIds;
     }
     if (images.length > 0) {
-      // Vision forces OpenAI. For legacy provider-scoped tokens this can
-      // cross-charge (e.g. a DEEPSEEK-only token pays for an OpenAI vision
-      // call via the selectTokenForProvider best-token fallback) — accepted
-      // in the batch-2 spec: provider distinctions are being deprecated.
-      effectiveProvider = 'OPENAI';
-      if (!isVisionModel(effectiveModel)) effectiveModel = VISION_FALLBACK_MODEL;
+      // Vision is Bedrock-only now and gated to a model the tier is allowed to
+      // use. If the tier has no vision model, fall back to its default text
+      // model (the image blocks are dropped downstream).
+      const visionModel = visionModelForTier(tier);
+      if (visionModel) effectiveModel = visionModel;
+      else if (!isVisionModel(String(effectiveModel))) effectiveModel = defaultModelForTier(tier);
     }
-    const chosenModel = isValidModel(effectiveProvider, effectiveModel) ? effectiveModel : defaultModel(effectiveProvider);
+    // Final gate: the resolved model must be valid AND allowed for the tier;
+    // otherwise fall back to the tier default.
+    const requested = String(effectiveModel);
+    const chosenModel = (isValidModel(requested) && isModelAllowedForTier(tier, requested))
+      ? requested
+      : defaultModelForTier(tier);
 
     // Everyone gets a persisted conversation. Anonymous conversations are
     // keyed anon:<id>, carry the requester ip, and expire after 30 days (ttl).
@@ -126,7 +120,7 @@ export async function POST(req: Request) {
       conversationId,
       (subject as { token?: { token: string } }).token?.token ?? email,
       email,
-      effectiveProvider,
+      'BEDROCK',
       convoOpts,
     );
 
@@ -152,23 +146,25 @@ export async function POST(req: Request) {
     if (atts.length > 0) {
       providerHistory = [{ role: 'system', content: ATTACHMENT_GUARD, createdAt: now }, ...providerHistory];
     }
-    const result = await runCompletion(effectiveProvider, chosenModel, providerHistory, undefined, images.length ? { images } : undefined);
+    const result = await runCompletion(chosenModel, providerHistory, undefined, images.length ? { images } : undefined);
     const cost = result.estimatedTokens + images.length * IMAGE_TOKEN_COST;
 
     const assistantMsg: Message = { role: 'assistant', content: result.content, createdAt: new Date().toISOString() };
 
     // Charge: approved-with-token-room → charge the Token; everyone else → Usage ledger.
     // Cap cost to remaining tokens — the completion already happened, so deliver the response.
-    // Provider errors (OpenAI/DeepSeek returned an error body) never charge — the
-    // user got a "⚠️ ..." message, not a real answer, so it shouldn't burn quota.
+    // Provider errors (Bedrock returned an error) never charge — the user got a
+    // "⚠️ ..." message, not a real answer, so it shouldn't burn quota.
     const chargeAmount = result.providerError ? 0 : Math.min(cost, pre.remainingTokens);
     if (result.providerError) {
       // no-op: skip charging entirely
     } else if (subject.kind === 'user' && subject.approved && subject.token && (subject.token.limit - subject.token.used) > 0) {
-      // Multi-token quota fix: Select token based on provider match.
-      // Priority: 1) Exact provider match, 2) 'ANY' provider, 3) Best token fallback
+      // Everything bills via IAM now, so there is no per-provider token match —
+      // charge the caller's best token (the one with the most remaining room).
       const allTokens = subject.tokens ?? (subject.token ? [subject.token] : []);
-      const tokenToCharge = selectTokenForProvider(allTokens, effectiveProvider, chosenModel) ?? subject.token;
+      const tokenToCharge = [...allTokens]
+        .filter((t) => t.isActive && (t.limit - t.used) > 0)
+        .sort((a, b) => (b.limit - b.used) - (a.limit - a.used))[0] ?? subject.token;
       await incrementTokenUsed(tokenToCharge.token, chargeAmount);
     } else {
       await consumeQuota(subject, chargeAmount);

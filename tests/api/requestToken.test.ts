@@ -72,10 +72,14 @@ describe('POST /api/requestToken', () => {
     );
   });
 
-  it('returns 400 for an invalid provider', async () => {
+  it('ignores a client-sent provider and always requests an ANY token (Bedrock-only)', async () => {
+    // Provider dimension was removed with the Bedrock cutover — all tokens bill
+    // via IAM, so any client-sent provider is ignored and coerced to 'ANY'.
     sessionUser.current = { email: `bogus-${Date.now()}@x.com` };
     const res = await POST(makeReq({ tokenLimit: 100, provider: 'BOGUS' }));
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    const call = vi.mocked(createTokenRequestSpy).mock.calls.at(-1)!;
+    expect(call[2]).toBe('ANY');
   });
 
   it('stores a sanitized reason and the requester ip', async () => {

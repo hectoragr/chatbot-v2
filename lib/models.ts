@@ -1,34 +1,92 @@
-export type Provider = 'OPENAI' | 'DEEPSEEK';
-export interface ModelOption { id: string; label: string; }
-export interface UnifiedModel { id: string; provider: Provider; label: string; description: string; costPer1kTokens: number; }
+// Bedrock-only model registry. Every model is invoked via a cross-region
+// inference profile (the `us.` prefix) in us-east-1, billed through IAM — no API
+// keys. IDs confirmed against `aws bedrock list-inference-profiles` for the
+// account; only dated/GA profiles are used (preview profiles excluded).
+export type Provider = 'BEDROCK';
+export type Tier = 'anon' | 'unapproved' | 'approved';
 
-// Sorted expensive → cheap (costPer1kTokens = approximate input price per 1K tokens USD)
+export interface ModelOption { id: string; label: string; }
+export interface UnifiedModel {
+  id: string;
+  provider: Provider;
+  label: string;
+  description: string;
+  costPer1kTokens: number; // approx input price per 1K tokens, USD
+  vision: boolean;
+}
+
+// Sorted expensive → cheap.
 export const ALL_MODELS: UnifiedModel[] = [
-  { id: 'gpt-4o',            provider: 'OPENAI',   label: 'GPT-4o',         description: 'OpenAI · flagship · ~$2.5/1K',   costPer1kTokens: 2.50 },
-  { id: 'gpt-4.1',           provider: 'OPENAI',   label: 'GPT-4.1',        description: 'OpenAI · capable · ~$2/1K',      costPer1kTokens: 2.00 },
-  { id: 'o3-mini',           provider: 'OPENAI',   label: 'o3 Mini',        description: 'OpenAI · reasoning · ~$1.1/1K',  costPer1kTokens: 1.10 },
-  { id: 'deepseek-reasoner', provider: 'DEEPSEEK', label: 'DeepSeek R1',    description: 'DeepSeek · reasoning · ~$0.55/1K', costPer1kTokens: 0.55 },
-  { id: 'gpt-4.1-mini',      provider: 'OPENAI',   label: 'GPT-4.1 Mini',  description: 'OpenAI · balanced · ~$0.4/1K',   costPer1kTokens: 0.40 },
-  { id: 'deepseek-chat',     provider: 'DEEPSEEK', label: 'DeepSeek V3',    description: 'DeepSeek · fast · ~$0.27/1K',    costPer1kTokens: 0.27 },
-  { id: 'gpt-4o-mini',       provider: 'OPENAI',   label: 'GPT-4o Mini',   description: 'OpenAI · efficient · ~$0.15/1K', costPer1kTokens: 0.15 },
-  { id: 'gpt-4.1-nano',      provider: 'OPENAI',   label: 'GPT-4.1 Nano',  description: 'OpenAI · cheapest · ~$0.1/1K',   costPer1kTokens: 0.10 },
+  { id: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', provider: 'BEDROCK', label: 'Claude Sonnet 4.5', description: 'Bedrock · flagship · vision', costPer1kTokens: 3.00, vision: true },
+  { id: 'us.mistral.pixtral-large-2502-v1:0',           provider: 'BEDROCK', label: 'Pixtral Large',      description: 'Bedrock · Mistral · vision',  costPer1kTokens: 2.00, vision: true },
+  { id: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',  provider: 'BEDROCK', label: 'Claude Haiku 4.5',   description: 'Bedrock · fast · vision',      costPer1kTokens: 0.80, vision: true },
+  { id: 'us.amazon.nova-pro-v1:0',                      provider: 'BEDROCK', label: 'Nova Pro',           description: 'Bedrock · balanced · vision',  costPer1kTokens: 0.80, vision: true },
+  { id: 'us.meta.llama3-3-70b-instruct-v1:0',           provider: 'BEDROCK', label: 'Llama 3.3 70B',      description: 'Bedrock · open-weight',        costPer1kTokens: 0.72, vision: false },
+  { id: 'us.amazon.nova-lite-v1:0',                     provider: 'BEDROCK', label: 'Nova Lite',          description: 'Bedrock · cheap · vision',     costPer1kTokens: 0.06, vision: true },
+  { id: 'us.amazon.nova-micro-v1:0',                    provider: 'BEDROCK', label: 'Nova Micro',         description: 'Bedrock · cheapest · text',    costPer1kTokens: 0.035, vision: false },
 ];
 
-// Per-provider list for backward compat
-export const MODELS: Record<Provider, ModelOption[]> = {
-  OPENAI: ALL_MODELS.filter((m) => m.provider === 'OPENAI').map(({ id, label }) => ({ id, label })),
-  DEEPSEEK: ALL_MODELS.filter((m) => m.provider === 'DEEPSEEK').map(({ id, label }) => ({ id, label })),
+// Cheapest model — used for the internal classifier + title-summary calls and as
+// the universal fallback.
+export const FALLBACK_MODEL = 'us.amazon.nova-micro-v1:0';
+
+// Per-tier model allowlists. A tier can only invoke models in its set; the auto
+// router picks only from the caller's set. Higher tiers are supersets in spirit
+// but each is listed explicitly so the gate is unambiguous.
+export const TIER_MODELS: Record<Tier, string[]> = {
+  anon: [
+    'us.amazon.nova-micro-v1:0',
+    'us.amazon.nova-lite-v1:0',
+  ],
+  unapproved: [
+    'us.amazon.nova-micro-v1:0',
+    'us.amazon.nova-lite-v1:0',
+    'us.amazon.nova-pro-v1:0',
+    'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+  ],
+  approved: ALL_MODELS.map((m) => m.id), // full set
 };
 
-export function modelsForProvider(p: Provider): ModelOption[] {
-  return MODELS[p] ?? [];
+// Default model per tier (used when a requested model is not allowed for the tier).
+export const TIER_DEFAULT: Record<Tier, string> = {
+  anon: 'us.amazon.nova-lite-v1:0',
+  unapproved: 'us.amazon.nova-pro-v1:0',
+  approved: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+};
+
+const MODEL_IDS = new Set(ALL_MODELS.map((m) => m.id));
+const VISION_IDS = new Set(ALL_MODELS.filter((m) => m.vision).map((m) => m.id));
+
+export function isValidModel(id: string): boolean {
+  return MODEL_IDS.has(id);
 }
-export function isValidModel(p: Provider, id: string): boolean {
-  return ALL_MODELS.some((m) => m.provider === p && m.id === id);
+export function isVisionModel(id: string): boolean {
+  return VISION_IDS.has(id);
 }
-export function defaultModel(p: Provider): string {
-  return modelsForProvider(p)[0].id;
+export function isModelAllowedForTier(tier: Tier, id: string): boolean {
+  return (TIER_MODELS[tier] ?? []).includes(id);
 }
-export function providerForModel(id: string): Provider {
-  return ALL_MODELS.find((m) => m.id === id)?.provider ?? 'OPENAI';
+export function defaultModelForTier(tier: Tier): string {
+  return TIER_DEFAULT[tier] ?? FALLBACK_MODEL;
+}
+/** A vision-capable model the given tier is allowed to use, or undefined. */
+export function visionModelForTier(tier: Tier): string | undefined {
+  return (TIER_MODELS[tier] ?? []).find((id) => VISION_IDS.has(id));
+}
+
+// Models grouped for the picker UI (single provider now, but keep the shape the
+// client already consumes).
+export const MODELS: Record<Provider, ModelOption[]> = {
+  BEDROCK: ALL_MODELS.map(({ id, label }) => ({ id, label })),
+};
+
+export function modelsForProvider(_p?: Provider): ModelOption[] {
+  return MODELS.BEDROCK;
+}
+export function defaultModel(): string {
+  return TIER_DEFAULT.anon;
+}
+// Everything is Bedrock now; kept for call sites that still ask.
+export function providerForModel(_id: string): Provider {
+  return 'BEDROCK';
 }

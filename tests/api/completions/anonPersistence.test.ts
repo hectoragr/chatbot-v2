@@ -24,7 +24,7 @@ function makeReq(body: Record<string, unknown>) {
   return new Request('http://x/api/completions', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-csrf-token': token, 'x-forwarded-for': ip, cookie: `anon_id=${anonId}` },
-    body: JSON.stringify({ message: 'hello there', provider: 'OPENAI', model: 'gpt-4o-mini', ...body }),
+    body: JSON.stringify({ message: 'hello there', provider: 'BEDROCK', model: 'us.amazon.nova-lite-v1:0', ...body }),
   });
 }
 
@@ -33,7 +33,7 @@ function makeReqAs(otherAnonId: string, otherIp: string, body: Record<string, un
   return new Request('http://x/api/completions', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-csrf-token': token, 'x-forwarded-for': otherIp, cookie: `anon_id=${otherAnonId}` },
-    body: JSON.stringify({ message: 'hello there', provider: 'OPENAI', model: 'gpt-4o-mini', ...body }),
+    body: JSON.stringify({ message: 'hello there', provider: 'BEDROCK', model: 'us.amazon.nova-lite-v1:0', ...body }),
   });
 }
 

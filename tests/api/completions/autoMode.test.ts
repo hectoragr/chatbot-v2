@@ -11,8 +11,8 @@ process.env.ANON_CAPTCHA_REQUIRED = 'false'; // anon captcha gate covered elsewh
 vi.mock('@/lib/auth', () => ({ getSessionUser: vi.fn(async () => null), isAdminEmail: () => false }));
 vi.mock('@/lib/providers', () => ({ runCompletion: vi.fn(async () => ({ content: 'hi', estimatedTokens: 10 })) }));
 vi.mock('@/lib/autoModel', () => ({
-  classifyMessage: vi.fn(async () => ({ model: 'deepseek-chat', docIds: [] })),
-  AUTO_FALLBACK_MODEL: 'gpt-4o-mini',
+  classifyMessage: vi.fn(async () => ({ model: 'us.amazon.nova-lite-v1:0', docIds: [] })),
+  AUTO_FALLBACK_MODEL: 'us.amazon.nova-micro-v1:0',
   HISTORY_WINDOW: 5,
   keywordPreMatch: vi.fn(() => []),
 }));
@@ -45,31 +45,46 @@ describe('completions auto mode', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.valid).toBe(true);
-    expect(body.modelUsed).toBe('deepseek-chat');
-    expect(vi.mocked(classifyMessage)).toHaveBeenCalledWith('hello', { allowedProviders: undefined, docTopics: undefined, history: [] });
-    // Provider derived from the resolved model, not the client-sent 'AUTO'.
-    expect(vi.mocked(runCompletion)).toHaveBeenCalledWith('DEEPSEEK', 'deepseek-chat', expect.any(Array), undefined, undefined);
+    // Anon tier allows Nova Lite, so the classifier's Nova Lite pick is honored.
+    expect(body.modelUsed).toBe('us.amazon.nova-lite-v1:0');
+    // Classifier receives the caller's tier allowlist (anon), not providers.
+    expect(vi.mocked(classifyMessage)).toHaveBeenCalledWith('hello', {
+      allowedModels: ['us.amazon.nova-micro-v1:0', 'us.amazon.nova-lite-v1:0'],
+      docTopics: undefined,
+      history: [],
+    });
+    // Bedrock signature: (model, messages, promptId?, opts?) — no provider arg.
+    expect(vi.mocked(runCompletion)).toHaveBeenCalledWith('us.amazon.nova-lite-v1:0', expect.any(Array), undefined, undefined);
   });
 
-  it('reports modelUsed on non-auto requests too', async () => {
-    const res = await POST(makeReq({ message: 'hello', provider: 'OPENAI', model: 'gpt-4o-mini' }));
+  it('reports modelUsed on non-auto requests too (tier-gated)', async () => {
+    // Anon requests Nova Lite explicitly — allowed for the tier.
+    const res = await POST(makeReq({ message: 'hello', provider: 'BEDROCK', model: 'us.amazon.nova-lite-v1:0' }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.modelUsed).toBe('gpt-4o-mini');
+    expect(body.modelUsed).toBe('us.amazon.nova-lite-v1:0');
+  });
+
+  it('anon requesting a flagship model is downgraded to the tier default', async () => {
+    // Sonnet is not in the anon allowlist → falls back to the anon default (Nova Lite).
+    const res = await POST(makeReq({ message: 'hello', provider: 'BEDROCK', model: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0' }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.modelUsed).toBe('us.amazon.nova-lite-v1:0');
   });
 
   it('rejects invalid model type', async () => {
-    const res = await POST(makeReq({ message: 'hello', provider: 'OPENAI', model: 42 }));
+    const res = await POST(makeReq({ message: 'hello', provider: 'BEDROCK', model: 42 }));
     expect(res.status).toBe(400);
   });
 
   it('rejects AUTO provider paired with a concrete model', async () => {
-    const res = await POST(makeReq({ message: 'hello', provider: 'AUTO', model: 'gpt-4o' }));
+    const res = await POST(makeReq({ message: 'hello', provider: 'AUTO', model: 'us.amazon.nova-pro-v1:0' }));
     expect(res.status).toBe(400);
   });
 
   it('rejects an unknown provider', async () => {
-    const res = await POST(makeReq({ message: 'hello', provider: 'BOGUS', model: 'gpt-4o' }));
+    const res = await POST(makeReq({ message: 'hello', provider: 'BOGUS', model: 'us.amazon.nova-lite-v1:0' }));
     expect(res.status).toBe(400);
   });
 });
@@ -87,7 +102,7 @@ describe('completions auto mode: gated users never invoke the classifier', () =>
       return new Request('http://x/api/completions', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-csrf-token': token, 'x-forwarded-for': localIp, cookie: `anon_id=${localAnonId}` },
-        body: JSON.stringify({ message: 'hello', provider: 'OPENAI', model: 'gpt-4o-mini' }),
+        body: JSON.stringify({ message: 'hello', provider: 'BEDROCK', model: 'us.amazon.nova-lite-v1:0' }),
       });
     }
     // Exhaust the anon quota (3 questions/day) with non-auto requests first.

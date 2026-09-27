@@ -11,8 +11,8 @@ process.env.ANON_CAPTCHA_REQUIRED = 'false'; // anon captcha gate covered elsewh
 vi.mock('@/lib/auth', () => ({ getSessionUser: vi.fn(async () => null), isAdminEmail: () => false }));
 vi.mock('@/lib/providers', () => ({ runCompletion: vi.fn(async () => ({ content: 'hi', estimatedTokens: 10 })) }));
 vi.mock('@/lib/autoModel', () => ({
-  classifyMessage: vi.fn(async () => ({ model: 'gpt-4o-mini', docIds: ['career'] })),
-  AUTO_FALLBACK_MODEL: 'gpt-4o-mini',
+  classifyMessage: vi.fn(async () => ({ model: 'us.amazon.nova-lite-v1:0', docIds: ['career'] })),
+  AUTO_FALLBACK_MODEL: 'us.amazon.nova-micro-v1:0',
   HISTORY_WINDOW: 5,
   keywordPreMatch: vi.fn(() => []),
 }));
@@ -39,8 +39,13 @@ describe('about-me doc injection', () => {
   it('prepends a system message with matched docs, not persisted content', async () => {
     const res = await POST(makeReq());
     expect(res.status).toBe(200);
-    const call = vi.mocked(runCompletion).mock.calls.at(-1)!;
-    const history = call[2] as { role: string; content: string }[];
+    // runSmallModelForSummary now also calls runCompletion (Bedrock title gen)
+    // as the LAST call — pick the completion whose history carries the doc.
+    const call = vi.mocked(runCompletion).mock.calls.find((c) => {
+      const h = c[1] as { role: string; content: string }[];
+      return h[0]?.role === 'system' && h[0].content.includes('Hector builds things.');
+    })!;
+    const history = call[1] as { role: string; content: string }[];
     expect(history[0].role).toBe('system');
     expect(history[0].content).toContain('Hector builds things.');
     expect(history[0].content).toContain('not instructions');

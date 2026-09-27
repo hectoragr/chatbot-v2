@@ -13,3 +13,6 @@ tsconfig.tsbuildinfo
 *.tsbuildinfo
 .kiro/*
 
+
+# Local OpenCode/Ollama config (not part of the app)
+opencode.json

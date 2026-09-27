@@ -164,7 +164,7 @@ describe('Preservation — Error fallback returns AUTO_FALLBACK_MODEL with empty
       docTopics: [{ doc_id: 'about', topics: 'Héctor, biography' }],
     });
 
-    expect(result.model).toBe('gpt-4o-mini');
+    expect(result.model).toBe('us.amazon.nova-micro-v1:0');
     expect(result.docIds).toEqual([]);
   });
 
@@ -185,15 +185,15 @@ describe('Preservation — Error fallback returns AUTO_FALLBACK_MODEL with empty
  * **Validates: Requirements 3.3**
  *
  * When the model returns a valid tier, the model selection must match
- * `pickForTier` logic — simple → gpt-4.1-nano, moderate → deepseek-chat,
- * complex → deepseek-reasoner.
+ * `pickForTier` logic — simple → Nova Lite, moderate → Nova Pro,
+ * complex → Claude Sonnet 4.5 (each capped to the caller's allowlist).
  */
 describe('Preservation — Tier selection maps to correct model', () => {
   beforeEach(() => {
     mockRunCompletion.mockClear();
   });
 
-  it('tier "simple" selects gpt-4.1-nano', async () => {
+  it('tier "simple" selects Nova Lite', async () => {
     mockRunCompletion.mockResolvedValue({
       content: '{"tier":"simple","docs":[]}',
       estimatedTokens: 10,
@@ -203,10 +203,10 @@ describe('Preservation — Tier selection maps to correct model', () => {
       docTopics: [{ doc_id: 'about', topics: 'Héctor, biography' }],
     });
 
-    expect(result.model).toBe('gpt-4.1-nano');
+    expect(result.model).toBe('us.amazon.nova-lite-v1:0');
   });
 
-  it('tier "moderate" selects deepseek-chat', async () => {
+  it('tier "moderate" selects Nova Pro', async () => {
     mockRunCompletion.mockResolvedValue({
       content: '{"tier":"moderate","docs":[]}',
       estimatedTokens: 10,
@@ -216,10 +216,10 @@ describe('Preservation — Tier selection maps to correct model', () => {
       docTopics: [{ doc_id: 'about', topics: 'Héctor, biography' }],
     });
 
-    expect(result.model).toBe('deepseek-chat');
+    expect(result.model).toBe('us.amazon.nova-pro-v1:0');
   });
 
-  it('tier "complex" selects deepseek-reasoner', async () => {
+  it('tier "complex" selects Claude Sonnet 4.5', async () => {
     mockRunCompletion.mockResolvedValue({
       content: '{"tier":"complex","docs":[]}',
       estimatedTokens: 10,
@@ -229,7 +229,22 @@ describe('Preservation — Tier selection maps to correct model', () => {
       docTopics: [{ doc_id: 'about', topics: 'Héctor, biography' }],
     });
 
-    expect(result.model).toBe('deepseek-reasoner');
+    expect(result.model).toBe('us.anthropic.claude-sonnet-4-5-20250929-v1:0');
+  });
+
+  it('respects the caller allowlist: complex on anon tier stays within allowed models', async () => {
+    mockRunCompletion.mockResolvedValue({
+      content: '{"tier":"complex","docs":[]}',
+      estimatedTokens: 10,
+    });
+
+    const result = await classifyMessage('Prove the Riemann hypothesis', {
+      docTopics: [{ doc_id: 'about', topics: 'Héctor, biography' }],
+      allowedModels: ['us.amazon.nova-micro-v1:0', 'us.amazon.nova-lite-v1:0'],
+    });
+
+    // Sonnet is not allowed for anon → falls back to the cheapest allowed model.
+    expect(['us.amazon.nova-micro-v1:0', 'us.amazon.nova-lite-v1:0']).toContain(result.model);
   });
 });
 
