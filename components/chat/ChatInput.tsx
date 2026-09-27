@@ -50,10 +50,11 @@ interface Props {
   pendingApproval?: boolean;
   providerRemaining?: Record<string, number>;
   lastAutoModel?: string | null;
+  chatCaptcha?: { question: string | null; prompt: boolean };
   contact?: { active: boolean; anon: boolean; question: string | null; onCancel: () => void };
 }
 
-export function ChatInput({ model, onModelChange, onSend, quota, pendingApproval, providerRemaining, lastAutoModel, contact }: Props) {
+export function ChatInput({ model, onModelChange, onSend, quota, pendingApproval, providerRemaining, lastAutoModel, chatCaptcha, contact }: Props) {
   const { t } = useTranslation();
   const [value, setValue] = useState('');
   const [captchaAnswer, setCaptchaAnswer] = useState('');
@@ -79,7 +80,7 @@ export function ChatInput({ model, onModelChange, onSend, quota, pendingApproval
         attachments.push({ name: f.name, kind, content });
       }
       const ok = await onSend(value.trim(), {
-        ...(contact?.active && contact.anon ? { captchaAnswer } : {}),
+        ...((contact?.active && contact.anon) || (!contact?.active && chatCaptcha) ? { captchaAnswer } : {}),
         ...(attachments.length ? { attachments } : {}),
       });
       if (ok === false) return;
@@ -112,6 +113,16 @@ export function ChatInput({ model, onModelChange, onSend, quota, pendingApproval
         <FormField label={t('captchaLabel', { question: contact.question })}>
           <Input value={captchaAnswer} onChange={({ detail }) => setCaptchaAnswer(detail.value)} placeholder="?" inputMode="numeric" />
         </FormField>
+      )}
+      {!contact?.active && chatCaptcha?.question && (
+        <>
+          {chatCaptcha.prompt && (
+            <Alert type="warning">{t('captchaRequired')}</Alert>
+          )}
+          <FormField label={t('captchaLabel', { question: chatCaptcha.question })}>
+            <Input value={captchaAnswer} onChange={({ detail }) => setCaptchaAnswer(detail.value)} placeholder="?" inputMode="numeric" />
+          </FormField>
+        </>
       )}
       {!contact?.active && (
         <SpaceBetween size="xs" direction="horizontal" alignItems="center">
