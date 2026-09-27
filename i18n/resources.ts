@@ -110,6 +110,7 @@ export const resources = {
       "contactSent": "Message sent. Thanks for reaching out!",
       "contactFailed": "Could not send the message. Please try again.",
       "captchaLabel": "Anti-spam check: what is {{question}}?",
+      "captchaRequired": "Please solve the anti-spam check to continue.",
 
       // Attachments
       "attachFiles": "Attach files",
@@ -227,6 +228,7 @@ export const resources = {
       "contactSent": "Mensaje enviado. ¡Gracias por escribir!",
       "contactFailed": "No se pudo enviar el mensaje. Inténtalo de nuevo.",
       "captchaLabel": "Control anti-spam: ¿cuánto es {{question}}?",
+      "captchaRequired": "Por favor resuelve el control anti-spam para continuar.",
 
       // Attachments
       "attachFiles": "Adjuntar archivos",
@@ -345,6 +347,7 @@ export const resources = {
       "contactSent": "Message envoyé. Merci !",
       "contactFailed": "Échec de l'envoi du message. Veuillez réessayer.",
       "captchaLabel": "Vérification anti-spam : combien font {{question}} ?",
+      "captchaRequired": "Veuillez résoudre la vérification anti-spam pour continuer.",
 
       // Attachments
       "attachFiles": "Joindre des fichiers",
@@ -463,6 +466,7 @@ export const resources = {
       "contactSent": "Nachricht gesendet. Danke!",
       "contactFailed": "Nachricht konnte nicht gesendet werden. Bitte erneut versuchen.",
       "captchaLabel": "Anti-Spam-Prüfung: Was ist {{question}}?",
+      "captchaRequired": "Bitte lösen Sie die Anti-Spam-Prüfung, um fortzufahren.",
 
       // Attachments
       "attachFiles": "Dateien anhängen",

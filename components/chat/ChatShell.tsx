@@ -45,6 +45,10 @@ export function ChatShell() {
   const [requestOpen, setRequestOpen] = useState(false);
   const [contactMode, setContactMode] = useState(false);
   const [captcha, setCaptcha] = useState<{ id: string; question: string } | null>(null);
+  // Anon CHAT captcha (separate from the contact-form captcha above so the two
+  // flows never clobber each other's challenge). Logged-in users never get one.
+  const [chatCaptcha, setChatCaptcha] = useState<{ id: string; question: string } | null>(null);
+  const [captchaPrompt, setCaptchaPrompt] = useState(false);
   const [contactStatus, setContactStatus] = useState<'idle' | 'sent' | 'error'>('idle');
 
   useEffect(() => {
@@ -57,6 +61,10 @@ export function ChatShell() {
       if (me.authenticated) {
         const c = await fetchConversations();
         setConversations(c.conversations ?? []);
+      } else {
+        // Anon users must clear a captcha per completion (server gate). Fetch an
+        // initial challenge so the field is ready on first send.
+        setChatCaptcha(await fetchCaptcha());
       }
     })();
   }, []);
@@ -101,8 +109,21 @@ export function ChatShell() {
     setMessages((m) => [...m, userMsg]);
     setTyping(true);
     const realConvoId = activeId?.startsWith(TEMP_PREFIX) ? null : activeId;
-    const { status, body } = await sendCompletion({ message: text, provider, model, conversationId: realConvoId, attachments: extra?.attachments });
+    const { status, body } = await sendCompletion({
+      message: text, provider, model, conversationId: realConvoId, attachments: extra?.attachments,
+      // Anon users carry the captcha; logged-in users omit it (server ignores it for them).
+      ...(!authenticated && chatCaptcha ? { captchaId: chatCaptcha.id, captchaAnswer: extra?.captchaAnswer } : {}),
+    });
     setTyping(false);
+    if (status === 400 && body.error === 'CAPTCHA_REQUIRED') {
+      // Answer was missing/wrong. Drop the optimistic user bubble, refresh the
+      // challenge and prompt again — do NOT show the generic error message.
+      setMessages((m) => m.filter((x) => x !== userMsg));
+      setChatCaptcha(await fetchCaptcha());
+      setCaptchaPrompt(true);
+      return false;
+    }
+    setCaptchaPrompt(false);
     if (status === 402 && body.error === 'provider_tokens_exhausted') {
       const providerName = body.provider ?? provider;
       const errMsg: Msg = { role: 'assistant', content: t('providerExhausted', { provider: providerName }), createdAt: new Date().toISOString() };
@@ -131,6 +152,9 @@ export function ChatShell() {
     const me = await fetchMe();
     setQuota(me.quota ?? EMPTY_QUOTA);
     if (me.providerRemaining) setProviderRemaining(me.providerRemaining);
+    // Rotate the anon challenge for the next send (each captcha id is stateless
+    // but a fresh one keeps the field's answer in sync with what was consumed).
+    if (!authenticated) setChatCaptcha(await fetchCaptcha());
     return true;
   };
 
@@ -208,6 +232,7 @@ export function ChatShell() {
                   pendingApproval={pendingApproval}
                   providerRemaining={providerRemaining}
                   lastAutoModel={lastAutoModel}
+                  chatCaptcha={!authenticated ? { question: chatCaptcha?.question ?? null, prompt: captchaPrompt } : undefined}
                   contact={contactMode ? { active: true, anon: !authenticated, question: captcha?.question ?? null, onCancel: () => setContactMode(false) } : undefined}
                 />
               }>

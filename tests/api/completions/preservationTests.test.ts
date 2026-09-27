@@ -27,6 +27,9 @@ process.env.DDB_ENDPOINT = 'http://localhost:8000';
 process.env.AWS_REGION = 'us-east-1';
 (process.env as Record<string, string>).NODE_ENV = 'test';
 process.env.CSRF_SECRET = 'test_secret_preservation';
+// Case 4 resolves an anon subject to assert charging semantics; the anon
+// captcha gate is exercised by captchaGate.test.ts, so disable it here.
+process.env.ANON_CAPTCHA_REQUIRED = 'false';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 

@@ -35,3 +35,32 @@ export function verifyCaptcha(id: string, answer: string): boolean {
     return false;
   }
 }
+
+/**
+ * Error code the completions route returns when an anonymous request is missing
+ * a valid captcha. The client maps this to "show the captcha challenge" (fetch
+ * a fresh one from /api/captcha, prompt the user, resubmit with captchaId +
+ * captchaAnswer). Distinct from quota/abuse errors so the UI reacts correctly.
+ */
+export const CAPTCHA_REQUIRED = 'CAPTCHA_REQUIRED';
+
+/**
+ * Gate for the ANONYMOUS tier only.
+ *
+ * TRIGGER CHOICE: we require a valid captcha on EVERY anonymous completion,
+ * not just the first. Rationale: the app is stateless per-request (Lambda), the
+ * captcha is a cheap stateless HMAC check (no DDB round-trip), and "after the
+ * first" would need a per-anon server-side "has-solved" marker (extra
+ * persistence) that a fresh cookie/IP trivially resets anyway. Requiring it
+ * every time is the simpler, strictly-stronger option and the client already
+ * caches a solved challenge within its TTL, so the UX cost is one solve per
+ * ~10-minute window. Logged-in users never hit this path.
+ *
+ * Returns true when the anon request carries a valid captcha and may proceed.
+ * `captchaId` / `captchaAnswer` come straight from the completions JSON body.
+ */
+export function anonCaptchaOk(captchaId: unknown, captchaAnswer: unknown): boolean {
+  if (typeof captchaId !== 'string' || captchaId.length === 0) return false;
+  if (captchaAnswer === undefined || captchaAnswer === null) return false;
+  return verifyCaptcha(captchaId, String(captchaAnswer));
+}

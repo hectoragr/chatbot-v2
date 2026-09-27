@@ -9,6 +9,9 @@ import { verifyCSRFTokenValue } from '@/lib/csrf';
 import { clientIp } from '@/lib/anon';
 import { findBlock, findPatternBlock, blockSubjects } from '@/lib/blocks';
 import { recordHitAndMaybeBlock } from '@/lib/abuse';
+import { anonCaptchaOk, CAPTCHA_REQUIRED } from '@/lib/captcha';
+import { checkGlobalKillSwitch, recordGlobalSpend } from '@/lib/killSwitch';
+import { anonCaptchaRequired } from '@/lib/limitsConfig';
 import { json, fail } from '@/lib/http';
 import type { Message } from '@/lib/ddb';
 import { selectTokenForProvider } from './selectTokenForProvider';
@@ -21,7 +24,7 @@ export async function POST(req: Request) {
     return json({ error: 'CSRF_TOKEN_INVALID' }, 403);
   }
   try {
-    const { message, conversationId, provider, model, attachments } = await req.json();
+    const { message, conversationId, provider, model, attachments, captchaId, captchaAnswer } = await req.json();
     if (!message || !provider) return json({ error: 'message and provider required' }, 400);
     if (model !== undefined && typeof model !== 'string') return json({ error: 'invalid model' }, 400);
     if (provider !== 'AUTO' && provider !== 'OPENAI' && provider !== 'DEEPSEEK') return json({ error: 'invalid provider' }, 400);
@@ -44,9 +47,27 @@ export async function POST(req: Request) {
       return json({ error: 'blocked', reason: block?.reason ?? patternBlock?.reason ?? 'burst_auto' }, 403);
     }
 
+    // Anonymous captcha gate: anon requests must carry a valid captcha
+    // (captchaId + captchaAnswer, verified by the stateless HMAC in
+    // lib/captcha.ts). Logged-in users are unaffected. Placed AFTER the burst /
+    // block gates so a captcha-less flood still counts toward the per-IP
+    // ceilings, but BEFORE quota + any model spend. The 400 error code
+    // CAPTCHA_REQUIRED tells the client to show the captcha challenge.
+    if (subject.kind === 'anon' && anonCaptchaRequired() && !anonCaptchaOk(captchaId, captchaAnswer)) {
+      return json({ error: CAPTCHA_REQUIRED }, 400);
+    }
+
     const pre = await getQuotaStatus(subject);
     if (pre.blocked) {
       return json({ error: 'quota_exceeded', tier: pre.tier, reason: pre.reason, resetsDaily: pre.resetsDaily }, 402);
+    }
+
+    // Global daily kill-switch: a last-resort brake on total token spend across
+    // ALL users for the day. Checked AFTER per-user quota and BEFORE any model
+    // call (one GetItem). Over budget → 503, provider is never called.
+    const killSwitch = await checkGlobalKillSwitch();
+    if (killSwitch.tripped) {
+      return json({ error: 'service_capacity_reached', reason: 'global_daily_budget' }, 503);
     }
 
     const user = await getSessionUser();
@@ -152,6 +173,11 @@ export async function POST(req: Request) {
     } else {
       await consumeQuota(subject, chargeAmount);
     }
+
+    // Feed the global daily kill-switch counter with the same charged amount so
+    // the switch reflects real spend across all users (no-op when chargeAmount
+    // is 0, e.g. a provider error).
+    await recordGlobalSpend(chargeAmount);
 
     if (convo) {
       if (conversationId !== convo.conversation_id) {

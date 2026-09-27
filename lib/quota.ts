@@ -1,10 +1,19 @@
 import { getUsage, addUsage, todayPeriod } from './usage.js';
 import type { TokenDoc } from './ddb.js';
+import {
+  ANON_QUESTIONS as CFG_ANON_QUESTIONS,
+  ANON_TOKENS as CFG_ANON_TOKENS,
+  UNAPPROVED_TOKENS as CFG_UNAPPROVED_TOKENS,
+  DAILY_TOKENS as CFG_DAILY_TOKENS,
+} from './limitsConfig.js';
 
-export const ANON_QUESTIONS = 3;
-export const ANON_TOKENS = 1000;
-export const UNAPPROVED_TOKENS = 1000;
-export const DAILY_TOKENS = 1000;
+// Keep the ORIGINAL exported constant names so existing imports/tests continue
+// to work. Values now come from lib/limitsConfig.ts (env-overridable) and
+// default to the same numbers, so behaviour is unchanged until overridden.
+export const ANON_QUESTIONS = CFG_ANON_QUESTIONS;
+export const ANON_TOKENS = CFG_ANON_TOKENS;
+export const UNAPPROVED_TOKENS = CFG_UNAPPROVED_TOKENS;
+export const DAILY_TOKENS = CFG_DAILY_TOKENS;
 
 export type QuotaSubject =
   | { kind: 'anon'; anonId: string; ip: string }

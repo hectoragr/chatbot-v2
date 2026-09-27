@@ -6,6 +6,9 @@ process.env.DDB_ENDPOINT = 'http://localhost:8000';
 process.env.AWS_REGION = 'us-east-1';
 (process.env as Record<string, string>).NODE_ENV = 'test';
 process.env.CSRF_SECRET = 'test_secret';
+// Anon captcha gate is exercised by lib/captcha.test.ts + a dedicated gate
+// test; disable it here so this test can focus on the anon quota behaviour.
+process.env.ANON_CAPTCHA_REQUIRED = 'false';
 
 vi.mock('@/lib/auth', () => ({ getSessionUser: vi.fn(async () => null), isAdminEmail: () => false }));
 vi.mock('@/lib/providers', () => ({ runCompletion: vi.fn(async () => ({ content: 'hi', estimatedTokens: 10 })) }));

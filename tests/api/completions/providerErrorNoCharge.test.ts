@@ -6,6 +6,7 @@ process.env.DDB_ENDPOINT = 'http://localhost:8000';
 process.env.AWS_REGION = 'us-east-1';
 (process.env as Record<string, string>).NODE_ENV = 'test';
 process.env.CSRF_SECRET = 'test_secret';
+process.env.ANON_CAPTCHA_REQUIRED = 'false'; // anon captcha gate covered elsewhere
 
 vi.mock('@/lib/auth', () => ({ getSessionUser: vi.fn(async () => null), isAdminEmail: () => false }));
 vi.mock('@/lib/providers', () => ({
