@@ -228,6 +228,22 @@ export class ChatbotV2Stack extends cdk.Stack {
       }),
     );
 
+    // Deploy-safe tuning env: read each knob from CDK context (undefined when
+    // not supplied), then drop the undefined ones so unset knobs fall back to
+    // the code defaults in lib/limitsConfig.ts. Never touches SSM, so a missing
+    // value can never fail the deploy.
+    const TUNING_KEYS = [
+      'BURST_WINDOW_SEC', 'BURST_MAX', 'AUTO_BLOCK_TTL_SEC',
+      'IP_HOURLY_MAX', 'IP_HOURLY_WINDOW_SEC', 'IP_DAILY_MAX', 'IP_DAILY_WINDOW_SEC',
+      'ANON_QUESTIONS', 'ANON_TOKENS', 'UNAPPROVED_TOKENS', 'DAILY_TOKENS',
+      'GLOBAL_DAILY_TOKENS', 'ANON_CAPTCHA_REQUIRED',
+    ] as const;
+    const tuningEnv: Record<string, string> = {};
+    for (const k of TUNING_KEYS) {
+      const v = this.node.tryGetContext(k);
+      if (v !== undefined && v !== null && `${v}` !== '') tuningEnv[k] = `${v}`;
+    }
+
     const serverFn = new lambda.Function(this, 'ServerFn', {
       functionName: 'chatbot-v2-server',
       // .open-next/server-functions/default contains index.mjs
@@ -260,6 +276,24 @@ export class ChatbotV2Stack extends cdk.Stack {
         OPENAI_API_KEY: ssmParam('OPENAI_API_KEY'),
         DEEPSEEK_API_KEY: ssmParam('DEEPSEEK_API_KEY'),
         ADMIN_EMAIL: ssmParam('ADMIN_EMAIL'),
+
+        // ── Abuse / quota / kill-switch tuning knobs (lib/limitsConfig.ts) ─────
+        // These let ops retune limits WITHOUT a code change. They are OPTIONAL:
+        // every one has a safe built-in default in lib/limitsConfig.ts, so the
+        // service behaves identically when they are unset. We wire them from
+        // CDK context (`-c KEY=VALUE` or cdk.json context) rather than from
+        // ssm.valueForStringParameter, because a missing SSM parameter makes
+        // valueForStringParameter FAIL the deploy — and these must stay
+        // deploy-safe when unset. An entry whose context value is undefined is
+        // filtered out below, so it never reaches the Lambda env and the code
+        // default wins.
+        //
+        // To promote any of these to an SSM-backed override instead, create the
+        // parameter and swap the value for `ssmParam('<NAME>')`, e.g.:
+        //   aws ssm put-parameter --name /chatbot-v2/prod/GLOBAL_DAILY_TOKENS --value "5000000" --type String
+        //   aws ssm put-parameter --name /chatbot-v2/prod/ANON_QUESTIONS      --value "3"       --type String
+        //   ...then: GLOBAL_DAILY_TOKENS: ssmParam('GLOBAL_DAILY_TOKENS'),
+        ...tuningEnv,
       },
     });
 
@@ -316,6 +350,49 @@ export class ChatbotV2Stack extends cdk.Stack {
     // Extract hostname from the function URL token for the HttpOrigin
     const serverOrigin = new origins.FunctionUrlOrigin(serverFnUrl);
 
+    // Origin request policy for the dynamic (server Lambda) behavior.
+    //
+    // WHY a custom policy: the managed ALL_VIEWER_EXCEPT_HOST_HEADER forwards
+    // every *viewer-sent* header but does NOT include CloudFront-MANAGED headers
+    // (the `CloudFront-*` family CloudFront adds at the edge). Our
+    // spoofing-resistant client-IP resolution (lib/anon.ts clientIp) needs
+    // `CloudFront-Viewer-Address` — the real TCP peer address CloudFront adds,
+    // which a client cannot forge. Without it the origin would fall back to the
+    // (spoofable) X-Forwarded-For and the IP-based abuse controls could be
+    // bypassed.
+    //
+    // WHY an allow-list (not `.all(...)`): the origin is a Lambda **Function
+    // URL**. Forwarding the viewer `Host` header to a Function URL origin breaks
+    // it (Host must match the FURL domain — this is exactly why the managed
+    // policy is the *_EXCEPT_HOST_HEADER* variant). This CDK version has no
+    // single "all-viewer-except-host PLUS a CloudFront header" builder, so we
+    // enumerate the headers the app actually consumes at the origin and add
+    // CloudFront-Viewer-Address, while deliberately NOT forwarding Host.
+    // Cookies (CSRF/auth) and query strings are forwarded in full below.
+    const serverOriginRequestPolicy = new cloudfront.OriginRequestPolicy(this, 'ServerOriginRequestPolicy', {
+      originRequestPolicyName: 'chatbot-v2-server-viewer-headers',
+      comment: 'Forward app headers + CloudFront-Viewer-Address (spoof-resistant client IP); Host excluded for Function URL origin.',
+      headerBehavior: cloudfront.OriginRequestHeaderBehavior.allowList(
+        // App-consumed viewer headers
+        'x-csrf-token',
+        'content-type',
+        'authorization',
+        'accept',
+        'accept-language',
+        'user-agent',
+        'referer',
+        'origin',
+        'x-forwarded-for',
+        'x-real-ip',
+        // CloudFront-managed header: the un-spoofable viewer IP:PORT that
+        // lib/anon.ts clientIp() prefers. Allowed here because it is added by
+        // CloudFront at the edge, not sent by the viewer.
+        'CloudFront-Viewer-Address',
+      ),
+      queryStringBehavior: cloudfront.OriginRequestQueryStringBehavior.all(),
+      cookieBehavior: cloudfront.OriginRequestCookieBehavior.all(),
+    });
+
     // CloudFront distribution
     // Behaviours:
     //   /_next/* → S3 (versioned static files, served at bucket root)
@@ -326,7 +403,10 @@ export class ChatbotV2Stack extends cdk.Stack {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
         cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        // Custom policy (above) forwards CloudFront-Viewer-Address so the origin
+        // can resolve a spoof-resistant client IP; the managed
+        // ALL_VIEWER_EXCEPT_HOST_HEADER does NOT include CloudFront-managed headers.
+        originRequestPolicy: serverOriginRequestPolicy,
       },
       additionalBehaviors: {
         '/_next/*': {
