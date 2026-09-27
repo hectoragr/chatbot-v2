@@ -1,16 +1,21 @@
 import { runCompletion } from './providers';
+import { FALLBACK_MODEL, ALL_MODELS } from './models';
 import type { Message } from './ddb';
-import type { Provider } from './models';
 
 type Tier = 'simple' | 'moderate' | 'complex';
 
-const TIER_MODELS: Record<Tier, { provider: Provider; model: string }[]> = {
-  simple:   [{ provider: 'OPENAI', model: 'gpt-4.1-nano' },   { provider: 'DEEPSEEK', model: 'deepseek-chat' }],
-  moderate: [{ provider: 'DEEPSEEK', model: 'deepseek-chat' }, { provider: 'OPENAI', model: 'gpt-4o-mini' }],
-  complex:  [{ provider: 'DEEPSEEK', model: 'deepseek-reasoner' }, { provider: 'OPENAI', model: 'o3-mini' }],
+// Difficulty tier → ordered Bedrock model preference (best-fit first). The auto
+// router picks the first candidate the caller's tier allowlist permits; if none
+// are allowed it falls back to the caller's default (handled in route.ts by
+// intersecting with the tier). Everything is Bedrock — no provider dimension.
+const TIER_MODELS: Record<Tier, string[]> = {
+  simple:   ['us.amazon.nova-lite-v1:0', 'us.amazon.nova-micro-v1:0'],
+  moderate: ['us.amazon.nova-pro-v1:0', 'us.anthropic.claude-haiku-4-5-20251001-v1:0', 'us.amazon.nova-lite-v1:0'],
+  complex:  ['us.anthropic.claude-sonnet-4-5-20250929-v1:0', 'us.anthropic.claude-haiku-4-5-20251001-v1:0', 'us.amazon.nova-pro-v1:0'],
 };
 
-export const AUTO_FALLBACK_MODEL = 'gpt-4o-mini';
+// Universal fallback when classification fails or nothing in a tier is allowed.
+export const AUTO_FALLBACK_MODEL = FALLBACK_MODEL;
 
 /** How many recent conversation turns to include in classification context. */
 export const HISTORY_WINDOW = 5;
@@ -23,7 +28,8 @@ const CLASSIFY_PROMPT =
   'Reply with only that one word.';
 
 export interface ClassifyOpts {
-  allowedProviders?: Provider[];
+  /** The caller's tier allowlist. Auto routing only picks a model in this set. */
+  allowedModels?: string[];
   docTopics?: { doc_id: string; topics: string }[];
   history?: Message[];
 }
@@ -116,13 +122,19 @@ const JSON_CLASSIFY_PROMPT = (docs: { doc_id: string; topics: string }[], histor
   return prompt;
 };
 
-function pickForTier(tier: Tier, allowedProviders?: Provider[]): string {
+function pickForTier(tier: Tier, allowedModels?: string[]): string {
   const candidates = TIER_MODELS[tier];
-  if (allowedProviders && allowedProviders.length > 0) {
-    const match = candidates.find((c) => allowedProviders.includes(c.provider));
-    if (match) return match.model;
+  if (allowedModels && allowedModels.length > 0) {
+    // First tier-preferred model the caller is allowed to use.
+    const match = candidates.find((m) => allowedModels.includes(m));
+    if (match) return match;
+    // Nothing in the tier's preference list is allowed — fall back to any
+    // allowed model, preferring the cheapest known one.
+    const cheapestAllowed = [...ALL_MODELS].reverse().find((m) => allowedModels.includes(m.id));
+    if (cheapestAllowed) return cheapestAllowed.id;
+    return AUTO_FALLBACK_MODEL;
   }
-  return candidates[0].model;
+  return candidates[0];
 }
 
 /**
@@ -143,7 +155,7 @@ export async function classifyMessage(message: string, opts?: ClassifyOpts): Pro
       content: `${prompt}\n\nQuestion:\n${message.slice(0, 2000)}`,
       createdAt: new Date().toISOString(),
     };
-    const { content } = await runCompletion('OPENAI', 'gpt-4.1-nano', [probe]);
+    const { content } = await runCompletion(FALLBACK_MODEL, [probe]);
 
     if (docTopics.length > 0) {
       const jsonText = content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
@@ -153,11 +165,11 @@ export async function classifyMessage(message: string, opts?: ClassifyOpts): Pro
       const modelDocIds = Array.isArray(parsed.docs) ? parsed.docs.filter((d): d is string => typeof d === 'string' && known.has(d)) : [];
       // Union: keyword pre-match + model classification (deduplicated)
       const docIds = [...new Set([...keywordIds, ...modelDocIds])];
-      return { model: tier ? pickForTier(tier, opts?.allowedProviders) : AUTO_FALLBACK_MODEL, docIds };
+      return { model: tier ? pickForTier(tier, opts?.allowedModels) : AUTO_FALLBACK_MODEL, docIds };
     }
 
     const tier = content.trim().toLowerCase().match(/\b(simple|moderate|complex)\b/)?.[1] as Tier | undefined;
-    return { model: tier ? pickForTier(tier, opts?.allowedProviders) : AUTO_FALLBACK_MODEL, docIds: [] };
+    return { model: tier ? pickForTier(tier, opts?.allowedModels) : AUTO_FALLBACK_MODEL, docIds: [] };
   } catch {
     return { model: AUTO_FALLBACK_MODEL, docIds: [] };
   }
