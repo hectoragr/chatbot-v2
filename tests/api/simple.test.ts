@@ -11,6 +11,8 @@ describe('simple routes', () => {
   it('models returns provider catalog', async () => {
     const res = await models();
     const body = await res.json();
-    expect(body.models.OPENAI.length).toBeGreaterThan(0);
+    expect(body.models.BEDROCK.length).toBeGreaterThan(0);
+    expect(body.allModels.length).toBeGreaterThan(0);
+    expect(body.allModels[0].provider).toBe('BEDROCK');
   });
 });
